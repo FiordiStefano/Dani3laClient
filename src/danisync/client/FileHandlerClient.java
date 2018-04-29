@@ -102,28 +102,33 @@ public class FileHandlerClient {
     }
 
     /**
-     * Legge il pezzo di file in base all'indice dato e lo assegna
+     * Legge il pezzo di file in base all'indice dato e lo assegna. Se l'indice
+     * dato è -1 il valore assegnato sarà null
      *
      * @param index l'indice del pezzo
      * @throws IOException se ci sono errori di lettura
      */
     protected void setChunkToSend(int index) throws IOException {
-        ByteBuffer buf = ByteBuffer.allocate(ChunkSize);
-        int len;
-        if ((len = fcClient.read(buf, (long) index * ChunkSize)) != -1) {
-            ChunkToSend = getByteArray(buf);
-        }
-
-        if (ChunkToSend.length % 2 == 0) {
-            nChunkPackets = ChunkToSend.length / PacketLength;
+        if (index == -1) {
+            ChunkToSend = null;
         } else {
-            nChunkPackets = ChunkToSend.length / PacketLength + 1;
+            ByteBuffer buf = ByteBuffer.allocate(ChunkSize);
+            int len;
+            if ((len = fcClient.read(buf, (long) index * ChunkSize)) != -1) {
+                ChunkToSend = getByteArray(buf);
+            }
+
+            if (ChunkToSend.length % 2 == 0) {
+                nChunkPackets = ChunkToSend.length / PacketLength;
+            } else {
+                nChunkPackets = ChunkToSend.length / PacketLength + 1;
+            }
         }
     }
 
     /**
      * Metodo che costruisce un pacchetto del un pezzo di file da inviare
-     * 
+     *
      * @param packetIndex il numero del pacchetto
      * @return il pacchetto dati
      * @throws MyExc se il pezzo di file non è settato
@@ -147,7 +152,7 @@ public class FileHandlerClient {
                 j++;
             }
         }
-        
+
         return createPacket(packetIndex, packet);
     }
 

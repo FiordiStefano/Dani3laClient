@@ -5,101 +5,49 @@
  */
 package danisync.client;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.awt.HeadlessException;
+import java.awt.Toolkit;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.util.zip.CRC32;
-import java.util.zip.Checksum;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import static javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE;
 
 /**
  *
  * @author Stefano Fiordi
  */
-public class DaniSyncClient {
+public class DaniSyncClient extends JFrame {
 
-    /**
-     * Crea il digest CRC32 di un array binario
-     *
-     * @param packet array binario
-     * @return il digest
-     * @throws NoSuchAlgorithmException
-     */
-    static long CRC32Hashing(byte[] packet) {
-        Checksum checksum = new CRC32();
-        checksum.update(packet, 0, packet.length);
-
-        return checksum.getValue();
-    }
-
-    /**
-     * Crea il chunk attraverso un buffer binario
-     *
-     * @param buf buffer binario
-     * @return il chunk array binario
-     */
-    static byte[] createChunk(ByteBuffer buf) {
-        buf.flip();
-        byte[] chunk = new byte[buf.remaining()];
-        buf.get(chunk);
-        buf.clear();
-
-        return chunk;
-    }
-
-    /**
-     * Scrive su un file indice tutti i digest
-     *
-     * @param digests array di digest da scrivere sul file
-     * @param filename il nome del file indice
-     * @throws IOException se ci sono errori durante la scrittura
-     */
-    public static void writeDigests(long[] digests, String filename) throws IOException {
-        BufferedWriter writer = new BufferedWriter(new FileWriter(filename, false));
-        for (long l : digests) {
-            String s = Long.toString(l);
-            while (s.length() < 10) {
-                s = "0" + s;
+    public DaniSyncClient() throws HeadlessException {
+        int width = (Toolkit.getDefaultToolkit().getScreenSize().width * 34) / 100;
+        int heigth = (Toolkit.getDefaultToolkit().getScreenSize().height * 30) / 100;
+        int x = (Toolkit.getDefaultToolkit().getScreenSize().width * 33) / 100;
+        int y = (Toolkit.getDefaultToolkit().getScreenSize().height * 20) / 100;
+        super.setBounds(x, y, width, heigth);
+        super.setResizable(false);
+        super.setTitle("DaniSync - Client");
+        super.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        super.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                if (JOptionPane.showConfirmDialog(DaniSyncClient.this, "Sei sicuro di voler uscire?", "Esci", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
+                    System.exit(0);
+                }
             }
-            writer.write(s);
-        }
-
-        writer.close();
+        });
     }
-
-    /**
-     * Legge i digest da un file indice
-     *
-     * @param filename il nome del file indice
-     * @param chunks il numero di digest da leggere
-     * @return l'array contenente i digest letti
-     * @throws IOException se ci sono errori durante la lettura
-     * @throws NumberFormatException se il digest letto presenta caratteri
-     * differenti da numeri
-     */
-    public static long[] readDigests(String filename, int chunks) throws IOException, NumberFormatException {
-        BufferedReader reader = new BufferedReader(new FileReader(filename));
-        char[] s = new char[10];
-        long[] digests = new long[chunks];
-        int len;
-        for (int i = 0; (len = reader.read(s)) != -1; i++) {
-            digests[i] = Long.parseLong(new String(s));
-        }
-        reader.close();
-
-        return digests;
-    }
+    
+    
 
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        File newVersion = new File("E:/dati/Download/ubuntu-17.10.1-desktop-amd64.iso");
+        
+        new DaniSyncClient().setVisible(true);
+        /*File newVersion = new File("E:/dati/Download/ubuntu-17.10.1-desktop-amd64.iso");
         try {
             FileHandlerClient fhc = new FileHandlerClient(newVersion, 1024 * 1024);
             fhc.FileIndexing();
@@ -107,49 +55,11 @@ public class DaniSyncClient {
         } catch (IOException | MyExc ex) {
             System.err.println("Error: " + ex.getMessage());
         }
-        /*File newVersion = new File("E:/vdis/FSV 2.vdi");
-        //File newVersion = new File("E:/dati/Download/ubuntu-17.10.1-desktop-amd64.iso");
-        long newChunks, ver;
-        final int ChunkSize = 1024 * 1024;
-        long[] newDigests;
-        
-        if (newVersion.length() % ChunkSize == 0) {
-            newChunks = newVersion.length() / ChunkSize;
-        } else {
-            newChunks = newVersion.length() / ChunkSize + 1;
-        }
 
         try {
-            File crcIndexes = new File(newVersion.getName() + ".crc");
-            if (!crcIndexes.exists()) {
-                FileCRCIndex fciNew = new FileCRCIndex(newVersion.getAbsolutePath(), ChunkSize, newChunks, newVersion.length());
+            Socket socket = new Socket("127.0.0.1", 6365);
 
-                System.out.println("CRC indexing started...");
-                newDigests = fciNew.calcDigests();
-
-                System.out.println("Writing " + crcIndexes.getName() + "...");
-                writeDigests(newDigests, newVersion.getName() + ".crc");
-                System.out.println("Success");
-            } else {
-                System.out.println("Reading indexes...");
-                newDigests = readDigests(newVersion.getName() + ".crc", (int) newChunks);
-                System.out.println("Success");
-                for (long l : newDigests) {
-                    System.out.println(l);
-                }
-            }
-
-            ver = CRC32Hashing(Files.readAllBytes(crcIndexes.toPath()));
-            System.out.println("Version: " + ver);
-
-            try {
-                Socket socket = new Socket("127.0.0.1", 6365);
-                
-
-            } catch (IOException ex) {
-                System.err.println("Error: " + ex.getMessage());
-            }
-        } catch (MyExc | IOException ex) {
+        } catch (IOException ex) {
             System.err.println("Error: " + ex.getMessage());
         }*/
     }
