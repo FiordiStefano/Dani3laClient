@@ -52,6 +52,14 @@ public class FileHandlerClient {
      */
     protected long nChunks;
     /**
+     * Pezzo da inviare
+     */
+    protected byte[] ChunkToSend;
+    /**
+     * Numero di pacchetti del pezzo da inviare
+     */
+    protected long nChunkPackets;
+    /**
      * Array di digest crc
      */
     protected long[] digests;
@@ -91,6 +99,56 @@ public class FileHandlerClient {
         if (this.crcIndex.exists()) {
             readDigests();
         }
+    }
+
+    /**
+     * Legge il pezzo di file in base all'indice dato e lo assegna
+     *
+     * @param index l'indice del pezzo
+     * @throws IOException se ci sono errori di lettura
+     */
+    protected void setChunkToSend(int index) throws IOException {
+        ByteBuffer buf = ByteBuffer.allocate(ChunkSize);
+        int len;
+        if ((len = fcClient.read(buf, (long) index * ChunkSize)) != -1) {
+            ChunkToSend = getByteArray(buf);
+        }
+
+        if (ChunkToSend.length % 2 == 0) {
+            nChunkPackets = ChunkToSend.length / PacketLength;
+        } else {
+            nChunkPackets = ChunkToSend.length / PacketLength + 1;
+        }
+    }
+
+    /**
+     * Metodo che costruisce un pacchetto del un pezzo di file da inviare
+     * 
+     * @param packetIndex il numero del pacchetto
+     * @return il pacchetto dati
+     * @throws MyExc se il pezzo di file non è settato
+     */
+    protected data buildChunkPacket(int packetIndex) throws MyExc {
+        if (ChunkToSend == null) {
+            throw new MyExc("Chunk to send is not set");
+        }
+
+        byte[] packet;
+        if (packetIndex != nChunkPackets - 1) {
+            packet = new byte[PacketLength];
+            for (int i = 0; i < PacketLength; i++) {
+                packet[i] = ChunkToSend[i + (packetIndex * PacketLength)];
+            }
+        } else {
+            packet = new byte[(int) (ChunkToSend.length - (nChunkPackets - 1) * PacketLength)];
+            int j = 0;
+            for (int i = packetIndex * PacketLength; i < ChunkToSend.length; i++) {
+                packet[j] = ChunkToSend[i];
+                j++;
+            }
+        }
+        
+        return createPacket(packetIndex, packet);
     }
 
     /**
