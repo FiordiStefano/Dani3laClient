@@ -3254,6 +3254,16 @@ public final class protoPacket {
      * <code>int64 crc = 2;</code>
      */
     long getCrc();
+
+    /**
+     * <code>string nam = 3;</code>
+     */
+    java.lang.String getNam();
+    /**
+     * <code>string nam = 3;</code>
+     */
+    com.google.protobuf.ByteString
+        getNamBytes();
   }
   /**
    * Protobuf type {@code packet.chunkReq}
@@ -3270,6 +3280,7 @@ public final class protoPacket {
     private chunkReq() {
       ind_ = 0;
       crc_ = 0L;
+      nam_ = "";
     }
 
     @java.lang.Override
@@ -3311,6 +3322,12 @@ public final class protoPacket {
             case 16: {
 
               crc_ = input.readInt64();
+              break;
+            }
+            case 26: {
+              java.lang.String s = input.readStringRequireUtf8();
+
+              nam_ = s;
               break;
             }
           }
@@ -3355,6 +3372,40 @@ public final class protoPacket {
       return crc_;
     }
 
+    public static final int NAM_FIELD_NUMBER = 3;
+    private volatile java.lang.Object nam_;
+    /**
+     * <code>string nam = 3;</code>
+     */
+    public java.lang.String getNam() {
+      java.lang.Object ref = nam_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        nam_ = s;
+        return s;
+      }
+    }
+    /**
+     * <code>string nam = 3;</code>
+     */
+    public com.google.protobuf.ByteString
+        getNamBytes() {
+      java.lang.Object ref = nam_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        nam_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
@@ -3373,6 +3424,9 @@ public final class protoPacket {
       if (crc_ != 0L) {
         output.writeInt64(2, crc_);
       }
+      if (!getNamBytes().isEmpty()) {
+        com.google.protobuf.GeneratedMessageV3.writeString(output, 3, nam_);
+      }
       unknownFields.writeTo(output);
     }
 
@@ -3388,6 +3442,9 @@ public final class protoPacket {
       if (crc_ != 0L) {
         size += com.google.protobuf.CodedOutputStream
           .computeInt64Size(2, crc_);
+      }
+      if (!getNamBytes().isEmpty()) {
+        size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, nam_);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -3409,6 +3466,8 @@ public final class protoPacket {
           == other.getInd());
       result = result && (getCrc()
           == other.getCrc());
+      result = result && getNam()
+          .equals(other.getNam());
       result = result && unknownFields.equals(other.unknownFields);
       return result;
     }
@@ -3425,6 +3484,8 @@ public final class protoPacket {
       hash = (37 * hash) + CRC_FIELD_NUMBER;
       hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
           getCrc());
+      hash = (37 * hash) + NAM_FIELD_NUMBER;
+      hash = (53 * hash) + getNam().hashCode();
       hash = (29 * hash) + unknownFields.hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -3558,6 +3619,8 @@ public final class protoPacket {
 
         crc_ = 0L;
 
+        nam_ = "";
+
         return this;
       }
 
@@ -3582,6 +3645,7 @@ public final class protoPacket {
         packet.protoPacket.chunkReq result = new packet.protoPacket.chunkReq(this);
         result.ind_ = ind_;
         result.crc_ = crc_;
+        result.nam_ = nam_;
         onBuilt();
         return result;
       }
@@ -3628,6 +3692,10 @@ public final class protoPacket {
         }
         if (other.getCrc() != 0L) {
           setCrc(other.getCrc());
+        }
+        if (!other.getNam().isEmpty()) {
+          nam_ = other.nam_;
+          onChanged();
         }
         this.mergeUnknownFields(other.unknownFields);
         onChanged();
@@ -3704,6 +3772,75 @@ public final class protoPacket {
       public Builder clearCrc() {
         
         crc_ = 0L;
+        onChanged();
+        return this;
+      }
+
+      private java.lang.Object nam_ = "";
+      /**
+       * <code>string nam = 3;</code>
+       */
+      public java.lang.String getNam() {
+        java.lang.Object ref = nam_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          nam_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>string nam = 3;</code>
+       */
+      public com.google.protobuf.ByteString
+          getNamBytes() {
+        java.lang.Object ref = nam_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          nam_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>string nam = 3;</code>
+       */
+      public Builder setNam(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  
+        nam_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string nam = 3;</code>
+       */
+      public Builder clearNam() {
+        
+        nam_ = getDefaultInstance().getNam();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string nam = 3;</code>
+       */
+      public Builder setNamBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+        
+        nam_ = value;
         onChanged();
         return this;
       }
@@ -3800,9 +3937,9 @@ public final class protoPacket {
       "\003res\030\001 \001(\t\022\013\n\003ind\030\002 \001(\021\" \n\004data\022\013\n\003num\030\001" +
       " \001(\005\022\013\n\003dat\030\002 \001(\014\"=\n\007crcInfo\022\013\n\003num\030\001 \001(" +
       "\005\022\013\n\003csz\030\002 \001(\005\022\013\n\003crc\030\003 \003(\t\022\013\n\003ver\030\004 \003(\003" +
-      "\"\"\n\006crcReq\022\013\n\003crc\030\001 \001(\t\022\013\n\003ver\030\002 \001(\003\"$\n\010" +
-      "chunkReq\022\013\n\003ind\030\001 \001(\021\022\013\n\003crc\030\002 \001(\003B\025\n\006pa" +
-      "cketB\013protoPacketb\006proto3"
+      "\"\"\n\006crcReq\022\013\n\003crc\030\001 \001(\t\022\013\n\003ver\030\002 \001(\003\"1\n\010" +
+      "chunkReq\022\013\n\003ind\030\001 \001(\021\022\013\n\003crc\030\002 \001(\003\022\013\n\003na" +
+      "m\030\003 \001(\tB\025\n\006packetB\013protoPacketb\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -3851,7 +3988,7 @@ public final class protoPacket {
     internal_static_packet_chunkReq_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_packet_chunkReq_descriptor,
-        new java.lang.String[] { "Ind", "Crc", });
+        new java.lang.String[] { "Ind", "Crc", "Nam", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

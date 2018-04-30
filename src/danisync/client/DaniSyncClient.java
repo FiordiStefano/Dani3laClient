@@ -5,7 +5,9 @@
  */
 package danisync.client;
 
-import java.awt.BorderLayout;
+import java.awt.Container;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.HeadlessException;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
@@ -22,6 +24,10 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import static javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE;
 import javax.swing.text.DefaultCaret;
+import packet.protoPacket.crcInfo;
+import packet.protoPacket.crcReq;
+import packet.protoPacket.resp;
+import packet.protoPacket.chunkReq;
 
 /**
  *
@@ -33,10 +39,14 @@ public class DaniSyncClient extends JFrame {
     JScrollPane monitorScroll;
     JTextField folderText;
     JButton chooseButton;
+    JButton calcButton;
     JButton conButton;
     JButton syncButton;
     File syncFolder;
     Thread thCalcCRC;
+    Thread thConnect;
+    Thread thSync;
+    Socket socket;
     int ChunkSize = 1024 * 1024;
     FileHandlerClient[] Files;
 
@@ -57,17 +67,28 @@ public class DaniSyncClient extends JFrame {
                 }
             }
         });
+        Container pane = this.getContentPane();
+        pane.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
         folderText = new JTextField("\\");
         folderText.setEditable(false);
-        this.add(folderText, BorderLayout.PAGE_START);
-        monitor = new JTextArea();
-        monitor.setEditable(false);
-        monitorScroll = new JScrollPane(monitor, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        DefaultCaret caret = (DefaultCaret) monitor.getCaret();
-        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
-        this.add(monitorScroll, BorderLayout.CENTER);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 50;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        gbc.ipady = 10;
+        pane.add(folderText, gbc);
+
         chooseButton = new JButton("Sfoglia...");
-        this.add(chooseButton, BorderLayout.LINE_START);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.0;
+        gbc.weighty = 0.0;
+        gbc.gridy = 0;
+        gbc.ipady = 4;
+        gbc.gridwidth = 1;
+        pane.add(chooseButton, gbc);
         chooseButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -106,17 +127,37 @@ public class DaniSyncClient extends JFrame {
                 }
             }
         });
-        conButton = new JButton("Calcola CRC");
-        this.add(conButton, BorderLayout.LINE_END);
-        conButton.addActionListener(new ActionListener() {
+
+        monitor = new JTextArea();
+        monitor.setEditable(false);
+        monitorScroll = new JScrollPane(monitor, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        DefaultCaret caret = (DefaultCaret) monitor.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.gridy = 1;
+        gbc.ipady = 0;
+        gbc.gridwidth = 3;
+        pane.add(monitorScroll, gbc);
+
+        calcButton = new JButton("Calcola CRC");
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.5;
+        gbc.weighty = 0.0;
+        gbc.gridy = 2;
+        gbc.ipady = 15;
+        gbc.gridwidth = 1;
+        pane.add(calcButton, gbc);
+        calcButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (conButton.getText().equals("Annulla")) {
+                if (calcButton.getText().equals("Annulla")) {
                     if (thCalcCRC != null && thCalcCRC.isAlive()) {
                         try {
                             thCalcCRC.interrupt();
                             monitor.append("Operazione annullata\n");
-                            conButton.setText("Calcola CRC");
+                            calcButton.setText("Calcola CRC");
                         } catch (SecurityException ex) {
                             JOptionPane.showMessageDialog(DaniSyncClient.this, "Impossibile annullare l'operazione");
                         }
@@ -126,7 +167,7 @@ public class DaniSyncClient extends JFrame {
                         if (Files.length != 0) {
                             calculateCRC();
                             thCalcCRC.start();
-                            conButton.setText("Annulla");
+                            calcButton.setText("Annulla");
                         } else {
                             JOptionPane.showMessageDialog(DaniSyncClient.this, "Nessun file trovato");
                         }
@@ -136,8 +177,32 @@ public class DaniSyncClient extends JFrame {
                 }
             }
         });
+
+        conButton = new JButton("Connetti");
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.5;
+        gbc.weighty = 0.0;
+        gbc.gridy = 2;
+        gbc.ipady = 15;
+        gbc.gridwidth = 1;
+        pane.add(conButton, gbc);
+        conButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                connect();
+                thConnect.start();
+            }
+        });
+
         syncButton = new JButton("Sincronizza");
-        this.add(syncButton, BorderLayout.PAGE_END);
+        syncButton.setEnabled(false);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.5;
+        gbc.weighty = 0.0;
+        gbc.gridy = 2;
+        gbc.ipady = 15;
+        gbc.gridwidth = 1;
+        pane.add(syncButton, gbc);
     }
 
     private void calculateCRC() {
@@ -158,9 +223,142 @@ public class DaniSyncClient extends JFrame {
                     }
                 }
                 monitor.append("Fine indicizzazione\n");
-                conButton.setText("Calcola CRC");
+                calcButton.setText("Calcola CRC");
             }
         });
+    }
+
+    private void connect() {
+        thConnect = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    socket = new Socket("127.0.0.1", 6365);
+                    syncButton.setEnabled(true);
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
+                }
+            }
+        });
+    }
+
+    private void synchronize() {
+        thSync = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    createCRCInfoPacket().writeDelimitedTo(socket.getOutputStream());
+
+                    while (true) {
+                        crcReq request = crcReq.parseDelimitedFrom(socket.getInputStream());
+                        if (request.getCrc().equals("end")) {
+                            break;
+                        }
+                        for (int i = 0; i < Files.length; i++) {
+                            if (Files[i].crcIndex.getName().equals(request.getCrc())) {
+                                Files[i].getInfoPacket().writeDelimitedTo(socket.getOutputStream());
+
+                                resp infoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
+                                if (infoRespPacket.getRes().equals("ok")) {
+                                    monitor.append("Inizio trasferimento " + Files[i].ClientFile.getName() + "...\n");
+                                    int errors = 0, j;
+                                    OUTER:
+                                    for (j = infoRespPacket.getInd(); j < Files[i].nPackets; j++) {
+                                        try {
+                                            Files[i].buildPacket(j);
+                                            errors = 0;
+                                            resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
+                                            switch (respPacket.getRes()) {
+                                                case "wp":
+                                                    j = respPacket.getInd() - 1;
+                                                    break;
+                                                case "mrr":
+                                                    monitor.append("Errore di trasferimento\n");
+                                                    break OUTER;
+                                            }
+                                        } catch (MyExc | IOException ex) {
+                                            if (errors == 3) {
+                                                monitor.append("Errore di lettura: impossibile trasferire il file\n");
+                                                break;
+                                            } else {
+                                                errors++;
+                                                j--;
+                                            }
+                                        }
+                                    }
+                                    if (j == Files[i].nPackets) {
+                                        monitor.append("Trasferimento completato con successo\n");
+                                    }
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+
+                    while (true) {
+                        chunkReq chunkReqPacket = chunkReq.parseDelimitedFrom(socket.getInputStream());
+                        if (chunkReqPacket.getInd() == -1) {
+                            break;
+                        }
+                        for (int i = 0; i < Files.length; i++) {
+                            if (chunkReqPacket.getNam().equals(Files[i].ClientFile.getName())) {
+                                monitor.append("Invio pezzo n." + chunkReqPacket.getInd() + " del file " + chunkReqPacket.getNam() + "...\n");
+                                Files[i].setChunkToSend(chunkReqPacket.getInd());
+                                int errors = 0, j;
+                                OUTER:
+                                for (j = 0; j < Files[i].nChunkPackets; j++) {
+                                    try {
+                                        Files[i].buildChunkPacket(j);
+                                        errors = 0;
+                                        resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
+                                        switch (respPacket.getRes()) {
+                                            case "wp":
+                                                j = respPacket.getInd() - 1;
+                                                break;
+                                            case "mrr":
+                                                monitor.append("Errore di trasferimento\n");
+                                                break OUTER;
+                                        }
+                                    } catch (MyExc | IOException ex) {
+                                        if (errors == 3) {
+                                            monitor.append("Errore di lettura: impossibile trasferire il file\n");
+                                            break;
+                                        } else {
+                                            errors++;
+                                            j--;
+                                        }
+                                    }
+                                }
+                                if (j == Files[i].nChunkPackets) {
+                                    monitor.append("Completato");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } catch (IOException ex) {
+                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
+                }
+            }
+        });
+    }
+
+    private crcInfo createCRCInfoPacket() {
+        crcInfo packet = crcInfo.newBuilder()
+                .setNum(Files.length)
+                .setCsz(ChunkSize)
+                .build();
+
+        int i = 0;
+        for (FileHandlerClient fhc : Files) {
+            packet = packet.toBuilder()
+                    .setCrc(i, fhc.crcIndex.getName())
+                    .setVer(i, fhc.version)
+                    .build();
+        }
+
+        return packet;
     }
 
     /**
