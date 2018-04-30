@@ -36,9 +36,6 @@ public class DaniSyncClient extends JFrame {
     JButton conButton;
     JButton syncButton;
     File syncFolder;
-    Thread thCalcCRC;
-    int ChunkSize = 1024 * 1024;
-    FileHandlerClient[] Files;
 
     public DaniSyncClient() throws HeadlessException {
         int width = (Toolkit.getDefaultToolkit().getScreenSize().width * 34) / 100;
@@ -82,85 +79,22 @@ public class DaniSyncClient extends JFrame {
                     if (dirChooser.getSelectedFile().exists()) {
                         syncFolder = dirChooser.getSelectedFile();
                         folderText.setText(syncFolder.getPath());
-                        int nFiles = 0;
-                        for (File f : syncFolder.listFiles()) {
-                            if (!f.isDirectory()) {
-                                nFiles++;
-                            }
-                        }
-                        Files = new FileHandlerClient[nFiles];
-                        int i = 0;
-                        for (File f : syncFolder.listFiles()) {
-                            if (!f.isDirectory()) {
-                                try {
-                                    Files[i] = new FileHandlerClient(f, ChunkSize);
-                                    i++;
-                                } catch (IOException | MyExc ex) {
-                                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
-                                }
-                            }
-                        }
                     } else {
                         JOptionPane.showMessageDialog(DaniSyncClient.this, "Directory inesistente");
                     }
                 }
             }
         });
-        conButton = new JButton("Calcola CRC");
+        conButton = new JButton("Calcola crc");
         this.add(conButton, BorderLayout.LINE_END);
         conButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (conButton.getText().equals("Annulla")) {
-                    if (thCalcCRC != null && thCalcCRC.isAlive()) {
-                        try {
-                            thCalcCRC.interrupt();
-                            monitor.append("Operazione annullata\n");
-                            conButton.setText("Calcola CRC");
-                        } catch (SecurityException ex) {
-                            JOptionPane.showMessageDialog(DaniSyncClient.this, "Impossibile annullare l'operazione");
-                        }
-                    }
-                } else {
-                    if (Files != null) {
-                        if (Files.length != 0) {
-                            calculateCRC();
-                            thCalcCRC.start();
-                            conButton.setText("Annulla");
-                        } else {
-                            JOptionPane.showMessageDialog(DaniSyncClient.this, "Nessun file trovato");
-                        }
-                    } else {
-                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
-                    }
-                }
+                
             }
         });
         syncButton = new JButton("Sincronizza");
         this.add(syncButton, BorderLayout.PAGE_END);
-    }
-
-    private void calculateCRC() {
-        thCalcCRC = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                monitor.append("Inizio indicizzazione...\n");
-                if (!new File("Indexes\\").exists()) {
-                    new File("Indexes\\").mkdir();
-                }
-                for (FileHandlerClient f : Files) {
-                    monitor.append("Indicizzazione di " + f.ClientFile.getName() + "\n");
-                    try {
-                        f.FileIndexing();
-                        monitor.append("Completata\n");
-                    } catch (IOException | MyExc ex) {
-                        monitor.append("Errore durante il calcolo\n");
-                    }
-                }
-                monitor.append("Fine indicizzazione\n");
-                conButton.setText("Calcola CRC");
-            }
-        });
     }
 
     /**

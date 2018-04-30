@@ -95,7 +95,7 @@ public class FileHandlerClient {
             nChunks = this.ClientFile.length() / this.ChunkSize + 1;
         }
 
-        this.crcIndex = new File("Indexes\\" + this.ClientFile.getName() + ".crc");
+        this.crcIndex = new File(this.ClientFile.getName() + ".crc");
         if (this.crcIndex.exists()) {
             readDigests();
         }
