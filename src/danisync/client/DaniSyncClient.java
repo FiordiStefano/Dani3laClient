@@ -30,6 +30,8 @@ import packet.protoPacket.resp;
 import packet.protoPacket.chunkReq;
 
 /**
+ * Classe principale che crea e gestisce la GUI, gestisce la cartella da
+ * sincronizzare (indicizzazione e sincronizzazione) e gestisce la connessione.
  *
  * @author Stefano Fiordi
  */
@@ -115,6 +117,9 @@ public class DaniSyncClient extends JFrame {
                             if (!f.isDirectory()) {
                                 try {
                                     Files[i] = new FileHandlerClient(f, ChunkSize);
+                                    if (Files[i].crcIndex.exists()) {
+                                        monitor.append("Letto file indice " + Files[i].crcIndex.getName() + " | Codice versione: " + Files[i].version + "\n");
+                                    }
                                     i++;
                                 } catch (IOException | MyExc ex) {
                                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
@@ -189,8 +194,12 @@ public class DaniSyncClient extends JFrame {
         conButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                connect();
-                thConnect.start();
+                if (Files != null) {
+                    connect();
+                    thConnect.start();
+                } else {
+                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
+                }
             }
         });
 
@@ -203,6 +212,21 @@ public class DaniSyncClient extends JFrame {
         gbc.ipady = 15;
         gbc.gridwidth = 1;
         pane.add(syncButton, gbc);
+        syncButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (Files != null) {
+                    if (checkCRCIndexes()) {
+                        synchronize();
+                        thSync.start();
+                    } else {
+                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Uno o più file indice mancanti");
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
+                }
+            }
+        });
     }
 
     private void calculateCRC() {
@@ -217,7 +241,7 @@ public class DaniSyncClient extends JFrame {
                     monitor.append("Indicizzazione di " + f.ClientFile.getName() + "\n");
                     try {
                         f.FileIndexing();
-                        monitor.append("Completata\n");
+                        monitor.append("Completata | Codice versione: " + f.version + "\n");
                     } catch (IOException | MyExc ex) {
                         monitor.append("Errore durante il calcolo\n");
                     }
@@ -252,20 +276,21 @@ public class DaniSyncClient extends JFrame {
                     while (true) {
                         crcReq request = crcReq.parseDelimitedFrom(socket.getInputStream());
                         if (request.getCrc().equals("end")) {
+                            resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
                             break;
                         }
                         for (int i = 0; i < Files.length; i++) {
                             if (Files[i].crcIndex.getName().equals(request.getCrc())) {
-                                Files[i].getInfoPacket().writeDelimitedTo(socket.getOutputStream());
+                                Files[i].getCRCIndexInfoPacket().writeDelimitedTo(socket.getOutputStream());
 
                                 resp infoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
                                 if (infoRespPacket.getRes().equals("ok")) {
-                                    monitor.append("Inizio trasferimento " + Files[i].ClientFile.getName() + "...\n");
+                                    monitor.append("Inizio trasferimento " + Files[i].crcIndex.getName() + "...\n");
                                     int errors = 0, j;
                                     OUTER:
-                                    for (j = infoRespPacket.getInd(); j < Files[i].nPackets; j++) {
+                                    for (j = infoRespPacket.getInd(); j < Files[i].nCRCIndexPackets; j++) {
                                         try {
-                                            Files[i].buildPacket(j);
+                                            Files[i].buildCRCIndexPacket(j);
                                             errors = 0;
                                             resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
                                             switch (respPacket.getRes()) {
@@ -286,8 +311,48 @@ public class DaniSyncClient extends JFrame {
                                             }
                                         }
                                     }
-                                    if (j == Files[i].nPackets) {
+                                    if (j == Files[i].nCRCIndexPackets) {
                                         monitor.append("Trasferimento completato con successo\n");
+                                        Files[i].getInfoPacket().writeDelimitedTo(socket.getOutputStream());
+
+                                        resp fInfoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
+                                        if (fInfoRespPacket.getRes().equals("ok")) {
+                                            monitor.append("Inizio trasferimento " + Files[i].ClientFile.getName() + "...\n");
+                                            int fErrors = 0, k;
+                                            OUTER:
+                                            for (k = fInfoRespPacket.getInd(); k < Files[i].nPackets; k++) {
+                                                try {
+                                                    Files[i].buildPacket(k);
+                                                    fErrors = 0;
+                                                    resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
+                                                    switch (respPacket.getRes()) {
+                                                        case "wp":
+                                                            k = respPacket.getInd() - 1;
+                                                            break;
+                                                        case "mrr":
+                                                            monitor.append("Errore di trasferimento\n");
+                                                            break OUTER;
+                                                    }
+                                                } catch (MyExc | IOException ex) {
+                                                    if (fErrors == 3) {
+                                                        monitor.append("Errore di lettura: impossibile trasferire il file\n");
+                                                        break;
+                                                    } else {
+                                                        fErrors++;
+                                                        k--;
+                                                    }
+                                                }
+                                            }
+                                            if (k == Files[i].nPackets) {
+                                                monitor.append("Trasferimento completato con successo\n");
+                                                resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
+                                            } else {
+                                                monitor.append("Trasferimento fallito\n");
+                                                resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
+                                            }
+                                        }
+                                    } else {
+                                        monitor.append("Trasferimento fallito\n");
                                     }
                                 }
 
@@ -344,6 +409,16 @@ public class DaniSyncClient extends JFrame {
         });
     }
 
+    private boolean checkCRCIndexes() {
+        for (FileHandlerClient fhc : Files) {
+            if (!fhc.crcIndex.exists()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private crcInfo createCRCInfoPacket() {
         crcInfo packet = crcInfo.newBuilder()
                 .setNum(Files.length)
@@ -367,21 +442,5 @@ public class DaniSyncClient extends JFrame {
     public static void main(String[] args) {
 
         new DaniSyncClient().setVisible(true);
-        /*File newVersion = new File("E:/dati/Download/ubuntu-17.10.1-desktop-amd64.iso");
-        try {
-            FileHandlerClient fhc = new FileHandlerClient(newVersion, 1024 * 1024);
-            fhc.FileIndexing();
-            System.out.println("Version: " + fhc.version);
-        } catch (IOException | MyExc ex) {
-            System.err.println("Error: " + ex.getMessage());
-        }
-
-        try {
-            Socket socket = new Socket("127.0.0.1", 6365);
-
-        } catch (IOException ex) {
-            System.err.println("Error: " + ex.getMessage());
-        }*/
     }
-
 }

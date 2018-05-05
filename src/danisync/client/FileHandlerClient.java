@@ -22,6 +22,10 @@ import packet.protoPacket.data;
 import packet.protoPacket.info;
 
 /**
+ * Classe che gestisce un file da sincronizzare, determina il numero di pezzi e
+ * di pacchetti, contiene i metodi per l'indicizzazione del file e per la
+ * lettura e scrittura su file degli indici CRC, per la creazione dei paccchetti
+ * (info, data) da inviare, sia per il file stesso che per il file indice.
  *
  * @author Stefano Fiordi
  */
@@ -68,6 +72,14 @@ public class FileHandlerClient {
      */
     protected File crcIndex;
     /**
+     * Canale di lettura del file indice
+     */
+    protected FileChannel fcCRCIndex;
+    /**
+     * Numero di pacchetti del file indice
+     */
+    protected long nCRCIndexPackets;
+    /**
      * Versione del file determinata dal crc calcolato sul file indice
      */
     protected long version;
@@ -80,9 +92,11 @@ public class FileHandlerClient {
      * @param ClientFile il file da sincronizzare
      * @param ChunkSize la grandezza dei pezzi
      * @throws IOException se la creazione del canale non va a buon fine
+     * @throws NumberFormatException se ci sono errori di lettura del file
+     * indice
      * @throws MyExc se c'è un errore nella lettura della versione
      */
-    public FileHandlerClient(File ClientFile, int ChunkSize) throws IOException, MyExc {
+    public FileHandlerClient(File ClientFile, int ChunkSize) throws IOException, NumberFormatException, MyExc {
         this.ClientFile = ClientFile;
         this.ChunkSize = ChunkSize;
         this.fcClient = new FileInputStream(this.ClientFile).getChannel();
@@ -96,8 +110,44 @@ public class FileHandlerClient {
         }
 
         this.crcIndex = new File("Indexes\\" + this.ClientFile.getName() + ".crc");
+        this.fcCRCIndex = new FileInputStream(this.crcIndex).getChannel();
         if (this.crcIndex.exists()) {
             readDigests();
+            if (this.crcIndex.length() % 2 == 0) {
+                nCRCIndexPackets = this.crcIndex.length() / PacketLength;
+            } else {
+                nCRCIndexPackets = this.crcIndex.length() / PacketLength + 1;
+            }
+        }
+    }
+
+    /**
+     * Crea il pacchetto contenente le informazioni sul file indice da inviare
+     *
+     * @return il pacchetto informazioni
+     */
+    protected info getCRCIndexInfoPacket() {
+        return info.newBuilder()
+                .setNam(crcIndex.getName())
+                .setLen(crcIndex.length())
+                .build();
+    }
+
+    /**
+     * Metodo che costruisce un pacchetto dati del file indice
+     *
+     * @param packetIndex il numero del pacchetto
+     * @return il pacchetto da inviare
+     * @throws IOException se si verifica un errore di lettura
+     * @throws MyExc se si verifica un errore di lettura
+     */
+    public data buildCRCIndexPacket(int packetIndex) throws IOException, MyExc {
+        ByteBuffer buf = ByteBuffer.allocate(PacketLength);
+        int len;
+        if ((len = fcCRCIndex.read(buf, (long) packetIndex * PacketLength)) != -1) {
+            return createPacket(packetIndex, getByteArray(buf));
+        } else {
+            throw new MyExc("Error while reading packet from file");
         }
     }
 
@@ -213,6 +263,11 @@ public class FileHandlerClient {
         FileCRCIndex fciClient = new FileCRCIndex(ClientFile.getAbsolutePath(), ChunkSize, nChunks, ClientFile.length());
         digests = fciClient.calcDigests();
         writeDigests();
+        if (this.crcIndex.length() % 2 == 0) {
+            nCRCIndexPackets = this.crcIndex.length() / PacketLength;
+        } else {
+            nCRCIndexPackets = this.crcIndex.length() / PacketLength + 1;
+        }
     }
 
     /**

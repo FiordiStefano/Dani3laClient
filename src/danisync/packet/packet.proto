@@ -36,4 +36,5 @@ message crcReq {
 message chunkReq {
 	sint32 ind = 1;
 	int64 crc = 2;
+	string nam = 3;
 }
