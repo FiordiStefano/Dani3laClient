@@ -24,6 +24,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import static javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE;
 import javax.swing.text.DefaultCaret;
+import packet.protoPacket.data;
 import packet.protoPacket.crcInfo;
 import packet.protoPacket.crcReq;
 import packet.protoPacket.resp;
@@ -194,11 +195,15 @@ public class DaniSyncClient extends JFrame {
         conButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (Files != null) {
-                    connect();
-                    thConnect.start();
+                if (conButton.getText().equals("Connetti")) {
+                    if (Files != null) {
+                        connect();
+                        thConnect.start();
+                    } else {
+                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
+                    }
                 } else {
-                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
+                    disconnect();
                 }
             }
         });
@@ -258,12 +263,27 @@ public class DaniSyncClient extends JFrame {
             public void run() {
                 try {
                     socket = new Socket("127.0.0.1", 6365);
+                    monitor.append("Host connesso: " + socket.getRemoteSocketAddress() + "\n");
+                    conButton.setText("Disconnetti");
                     syncButton.setEnabled(true);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
                 }
             }
         });
+    }
+
+    private void disconnect() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    socket.close();
+                    conButton.setText("Connetti");
+                } catch (IOException ex) {
+                }
+            }
+        }).start();
     }
 
     private void synchronize() {
@@ -290,7 +310,7 @@ public class DaniSyncClient extends JFrame {
                                     OUTER:
                                     for (j = infoRespPacket.getInd(); j < Files[i].nCRCIndexPackets; j++) {
                                         try {
-                                            Files[i].buildCRCIndexPacket(j);
+                                            Files[i].buildCRCIndexPacket(j).writeDelimitedTo(socket.getOutputStream());
                                             errors = 0;
                                             resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
                                             switch (respPacket.getRes()) {
@@ -322,7 +342,7 @@ public class DaniSyncClient extends JFrame {
                                             OUTER:
                                             for (k = fInfoRespPacket.getInd(); k < Files[i].nPackets; k++) {
                                                 try {
-                                                    Files[i].buildPacket(k);
+                                                    Files[i].buildPacket(k).writeDelimitedTo(socket.getOutputStream());
                                                     fErrors = 0;
                                                     resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
                                                     switch (respPacket.getRes()) {
@@ -336,6 +356,7 @@ public class DaniSyncClient extends JFrame {
                                                 } catch (MyExc | IOException ex) {
                                                     if (fErrors == 3) {
                                                         monitor.append("Errore di lettura: impossibile trasferire il file\n");
+                                                        data.newBuilder().setNum(-1);
                                                         break;
                                                     } else {
                                                         fErrors++;
@@ -374,7 +395,7 @@ public class DaniSyncClient extends JFrame {
                                 OUTER:
                                 for (j = 0; j < Files[i].nChunkPackets; j++) {
                                     try {
-                                        Files[i].buildChunkPacket(j);
+                                        Files[i].buildChunkPacket(j).writeDelimitedTo(socket.getOutputStream());
                                         errors = 0;
                                         resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
                                         switch (respPacket.getRes()) {
@@ -405,6 +426,10 @@ public class DaniSyncClient extends JFrame {
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
                 }
+                try {
+                    socket.close();
+                } catch (IOException ex) {
+                }
             }
         });
     }
@@ -428,7 +453,7 @@ public class DaniSyncClient extends JFrame {
         int i = 0;
         for (FileHandlerClient fhc : Files) {
             packet = packet.toBuilder()
-                    .setCrc(i, fhc.crcIndex.getName())
+                    .setCrc(i, fhc.ClientFile.getName())
                     .setVer(i, fhc.version)
                     .build();
         }
