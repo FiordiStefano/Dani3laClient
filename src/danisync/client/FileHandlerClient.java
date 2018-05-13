@@ -42,7 +42,7 @@ public class FileHandlerClient {
     /**
      * Numero di pacchetti
      */
-    protected long nPackets;
+    //protected long nPackets;
     /**
      * Canale di lettura del file
      */
@@ -102,10 +102,10 @@ public class FileHandlerClient {
         this.fcClient = new FileInputStream(this.ClientFile).getChannel();
 
         if (this.ClientFile.length() % 2 == 0) {
-            nPackets = this.ClientFile.length() / PacketLength;
+            //nPackets = this.ClientFile.length() / PacketLength;
             nChunks = this.ClientFile.length() / this.ChunkSize;
         } else {
-            nPackets = this.ClientFile.length() / PacketLength + 1;
+            //nPackets = this.ClientFile.length() / PacketLength + 1;
             nChunks = this.ClientFile.length() / this.ChunkSize + 1;
         }
 
@@ -175,6 +175,13 @@ public class FileHandlerClient {
             }
         }
     }
+    
+    protected info getChunkInfoPacket(int index) {
+        return info.newBuilder()
+                .setNam(ClientFile.getName())
+                .setLen(ChunkToSend.length)
+                .build();
+    }
 
     /**
      * Metodo che costruisce un pacchetto del un pezzo di file da inviare
@@ -211,14 +218,13 @@ public class FileHandlerClient {
      *
      * @return il pacchetto informazioni
      */
-    protected info getInfoPacket() {
+    /*protected info getInfoPacket() {
         return info.newBuilder()
                 .setNam(ClientFile.getName())
                 .setLen(ClientFile.length())
                 .setVer(version)
                 .build();
-    }
-
+    }*/
     /**
      * Metodo che crea il pacchetto dati
      *
@@ -242,7 +248,7 @@ public class FileHandlerClient {
      * @throws IOException se si verifica un errore di lettura
      * @throws MyExc se si verifica un errore di lettura
      */
-    public data buildPacket(int packetIndex) throws IOException, MyExc {
+    /*public data buildPacket(int packetIndex) throws IOException, MyExc {
         ByteBuffer buf = ByteBuffer.allocate(PacketLength);
         int len;
         if ((len = fcClient.read(buf, (long) packetIndex * PacketLength)) != -1) {
@@ -250,8 +256,8 @@ public class FileHandlerClient {
         } else {
             throw new MyExc("Error while reading packet from file");
         }
-    }
-
+    }*/
+    
     /**
      * Calcola i digest e li scrive su un file .crc
      *
@@ -260,8 +266,12 @@ public class FileHandlerClient {
      * @throws MyExc se il calcolo non va a buon fine
      */
     protected void FileIndexing() throws IOException, MyExc {
-        FileCRCIndex fciClient = new FileCRCIndex(ClientFile.getAbsolutePath(), ChunkSize, nChunks, ClientFile.length());
-        digests = fciClient.calcDigests();
+        if (ClientFile.length() < ChunkSize) {
+            FileCRCIndex fciClient = new FileCRCIndex(ClientFile.getAbsolutePath(), ChunkSize, nChunks, ClientFile.length());
+            digests = fciClient.calcDigests();
+        } else {
+            digests[0] = CRC32Hashing(Files.readAllBytes(ClientFile.toPath()));
+        }
         writeDigests();
         if (this.crcIndex.length() % 2 == 0) {
             nCRCIndexPackets = this.crcIndex.length() / PacketLength;
@@ -317,14 +327,18 @@ public class FileHandlerClient {
 
         writer.close();
 
-        writer = new BufferedWriter(new FileWriter(crcIndex, true));
-        version = CRC32Hashing(Files.readAllBytes(crcIndex.toPath()));
-        s = Long.toString(version);
-        while (s.length() < 10) {
-            s = "0" + s;
+        if (digests.length > 1) {
+            writer = new BufferedWriter(new FileWriter(crcIndex, true));
+            version = CRC32Hashing(Files.readAllBytes(crcIndex.toPath()));
+            s = Long.toString(version);
+            while (s.length() < 10) {
+                s = "0" + s;
+            }
+            writer.write(s);
+            writer.close();
+        } else {
+            version = digests[0];
         }
-        writer.write(s);
-        writer.close();
     }
 
     /**

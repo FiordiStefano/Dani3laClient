@@ -300,7 +300,7 @@ public class DaniSyncClient extends JFrame {
                             break;
                         }
                         for (int i = 0; i < Files.length; i++) {
-                            if (Files[i].crcIndex.getName().equals(request.getCrc())) {
+                            if (Files[i].crcIndex.getName().equals(request.getCrc()) && Files[i].version == request.getVer()) {
                                 Files[i].getCRCIndexInfoPacket().writeDelimitedTo(socket.getOutputStream());
 
                                 resp infoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
@@ -332,7 +332,7 @@ public class DaniSyncClient extends JFrame {
                                         }
                                     }
                                     if (j == Files[i].nCRCIndexPackets) {
-                                        monitor.append("Trasferimento completato con successo\n");
+                                        /*monitor.append("Trasferimento completato con successo\n");
                                         Files[i].getInfoPacket().writeDelimitedTo(socket.getOutputStream());
 
                                         resp fInfoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
@@ -372,8 +372,12 @@ public class DaniSyncClient extends JFrame {
                                                 resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
                                             }
                                         }
+                                    } else {*/
+                                        resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
+                                        monitor.append("Trasferimento file crc completato\n");
                                     } else {
-                                        monitor.append("Trasferimento fallito\n");
+                                        resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
+                                        monitor.append("Trasferimento file crc fallito\n");
                                     }
                                 }
 
@@ -391,34 +395,44 @@ public class DaniSyncClient extends JFrame {
                             if (chunkReqPacket.getNam().equals(Files[i].ClientFile.getName())) {
                                 monitor.append("Invio pezzo n." + chunkReqPacket.getInd() + " del file " + chunkReqPacket.getNam() + "...\n");
                                 Files[i].setChunkToSend(chunkReqPacket.getInd());
-                                int errors = 0, j;
-                                OUTER:
-                                for (j = 0; j < Files[i].nChunkPackets; j++) {
-                                    try {
-                                        Files[i].buildChunkPacket(j).writeDelimitedTo(socket.getOutputStream());
-                                        errors = 0;
-                                        resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
-                                        switch (respPacket.getRes()) {
-                                            case "wp":
-                                                j = respPacket.getInd() - 1;
+                                Files[i].getChunkInfoPacket(chunkReqPacket.getInd()).writeDelimitedTo(socket.getOutputStream());
+
+                                resp chunkInfoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
+                                if (chunkInfoRespPacket.getRes().equals("ok")) {
+                                    int errors = 0, j;
+                                    OUTER:
+                                    for (j = 0; j < Files[i].nChunkPackets; j++) {
+                                        try {
+                                            Files[i].buildChunkPacket(j).writeDelimitedTo(socket.getOutputStream());
+                                            errors = 0;
+                                            resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
+                                            switch (respPacket.getRes()) {
+                                                case "wp":
+                                                    j = respPacket.getInd() - 1;
+                                                    break;
+                                                case "mrr":
+                                                    monitor.append("Errore di trasferimento\n");
+                                                    break OUTER;
+                                            }
+                                        } catch (MyExc | IOException ex) {
+                                            if (errors == 3) {
+                                                monitor.append("Errore di lettura: impossibile trasferire il file\n");
                                                 break;
-                                            case "mrr":
-                                                monitor.append("Errore di trasferimento\n");
-                                                break OUTER;
-                                        }
-                                    } catch (MyExc | IOException ex) {
-                                        if (errors == 3) {
-                                            monitor.append("Errore di lettura: impossibile trasferire il file\n");
-                                            break;
-                                        } else {
-                                            errors++;
-                                            j--;
+                                            } else {
+                                                errors++;
+                                                j--;
+                                            }
                                         }
                                     }
+                                    if (j == Files[i].nChunkPackets) {
+                                        resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
+                                        monitor.append("Trasferimento completato");
+                                    } else {
+                                        resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
+                                        monitor.append("Trasferimento fallito\n");
+                                    }
                                 }
-                                if (j == Files[i].nChunkPackets) {
-                                    monitor.append("Completato");
-                                }
+
                                 break;
                             }
                         }
@@ -446,13 +460,13 @@ public class DaniSyncClient extends JFrame {
 
     private crcInfo createCRCInfoPacket() {
         crcInfo packet = crcInfo.newBuilder()
-                .setNum(Files.length)
                 .setCsz(ChunkSize)
                 .build();
 
         int i = 0;
         for (FileHandlerClient fhc : Files) {
             packet = packet.toBuilder()
+                    .setLen(i, fhc.ClientFile.length())
                     .setCrc(i, fhc.ClientFile.getName())
                     .setVer(i, fhc.version)
                     .build();
