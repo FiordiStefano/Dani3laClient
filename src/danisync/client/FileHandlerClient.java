@@ -113,15 +113,15 @@ public class FileHandlerClient {
             new File("Indexes\\").mkdir();
         }
         this.crcIndex = new File("Indexes\\" + this.ClientFile.getName() + ".crc");
-        this.fcCRCIndex = new FileInputStream(this.crcIndex).getChannel();
-        if (this.crcIndex.exists()) {
+        /*if (this.crcIndex.exists()) {
+            this.fcCRCIndex = new FileInputStream(this.crcIndex).getChannel();
             readDigests();
             if (this.crcIndex.length() % this.PacketLength == 0) {
                 nCRCIndexPackets = this.crcIndex.length() / PacketLength;
             } else {
                 nCRCIndexPackets = this.crcIndex.length() / PacketLength + 1;
             }
-        }
+        }*/
     }
 
     /**
@@ -268,13 +268,15 @@ public class FileHandlerClient {
      * @throws MyExc se il calcolo non va a buon fine
      */
     protected void FileIndexing() throws IOException, MyExc {
-        if (ClientFile.length() < ChunkSize) {
+        if (ClientFile.length() > ChunkSize) {
             FileCRCIndex fciClient = new FileCRCIndex(ClientFile.getAbsolutePath(), ChunkSize, nChunks, ClientFile.length());
             digests = fciClient.calcDigests();
         } else {
+            digests = new long[1];
             digests[0] = CRC32Hashing(Files.readAllBytes(ClientFile.toPath()));
         }
         writeDigests();
+        this.fcCRCIndex = new FileInputStream(this.crcIndex).getChannel();
         if (this.crcIndex.length() % this.PacketLength == 0) {
             nCRCIndexPackets = this.crcIndex.length() / PacketLength;
         } else {

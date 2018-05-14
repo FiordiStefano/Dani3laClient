@@ -43,7 +43,7 @@ public class DaniSyncClient extends JFrame {
 
     JTextArea monitor;
     JScrollPane monitorScroll;
-    JTextField folderText;
+    JTextField dirText;
     JButton chooseButton;
     JButton calcButton;
     JButton conButton;
@@ -83,14 +83,14 @@ public class DaniSyncClient extends JFrame {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        folderText = new JTextField("\\");
-        folderText.setEditable(false);
+        dirText = new JTextField("\\");
+        dirText.setEditable(false);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 50;
         gbc.gridy = 0;
         gbc.gridwidth = 2;
         gbc.ipady = 10;
-        pane.add(folderText, gbc);
+        pane.add(dirText, gbc);
 
         chooseButton = new JButton("Sfoglia...");
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -113,7 +113,7 @@ public class DaniSyncClient extends JFrame {
                 if (result == JFileChooser.APPROVE_OPTION) {
                     if (dirChooser.getSelectedFile().exists()) {
                         syncDir = dirChooser.getSelectedFile();
-                        folderText.setText(syncDir.getPath());
+                        dirText.setText(syncDir.getPath());
                         int nFiles = 0;
                         for (File f : syncDir.listFiles()) {
                             if (!f.isDirectory()) {
@@ -126,9 +126,9 @@ public class DaniSyncClient extends JFrame {
                             if (!f.isDirectory()) {
                                 try {
                                     Files[i] = new FileHandlerClient(f, ChunkSize);
-                                    if (Files[i].crcIndex.exists()) {
+                                    /*if (Files[i].crcIndex.exists()) {
                                         monitor.append("Letto file indice " + Files[i].crcIndex.getName() + " | Codice versione: " + Files[i].version + "\n");
-                                    }
+                                    }*/
                                     i++;
                                 } catch (IOException | MyExc ex) {
                                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
@@ -458,15 +458,19 @@ public class DaniSyncClient extends JFrame {
                             }
                         }
                     }
+                    
+                    monitor.append("Sincronizzazione completata\n");
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
                     conButton.setText("Connetti");
                     syncButton.setEnabled(false);
                 }
-                try {
+                /*try {
                     socket.close();
+                    conButton.setText("Connetti");
+                    syncButton.setEnabled(false);
                 } catch (IOException ex) {
-                }
+                }*/
             }
         });
     }
@@ -491,7 +495,7 @@ public class DaniSyncClient extends JFrame {
      *
      * @throws IOException se ci sono errori durante la lettura
      */
-    public void readConfig() throws IOException {
+    private void readConfig() throws IOException {
         if (new File("cConfig.ini").exists()) {
             BufferedReader reader = new BufferedReader(new FileReader(new File("cConfig.ini")));
             String s = reader.readLine();
@@ -500,7 +504,7 @@ public class DaniSyncClient extends JFrame {
                 if (!syncDir.exists() || !syncDir.isDirectory()) {
                     syncDir = null;
                 } else if (syncDir.exists() && syncDir.isDirectory()) {
-                    folderText.setText(syncDir.getAbsolutePath());
+                    dirText.setText(syncDir.getAbsolutePath());
                     int nFiles = 0;
                     for (File f : syncDir.listFiles()) {
                         if (!f.isDirectory()) {
@@ -513,9 +517,9 @@ public class DaniSyncClient extends JFrame {
                         if (!f.isDirectory()) {
                             try {
                                 Files[i] = new FileHandlerClient(f, ChunkSize);
-                                if (Files[i].crcIndex.exists()) {
+                                /*if (Files[i].crcIndex.exists()) {
                                     monitor.append("Letto file indice " + Files[i].crcIndex.getName() + " | Codice versione: " + Files[i].version + "\n");
-                                }
+                                }*/
                                 i++;
                             } catch (IOException | MyExc ex) {
                                 JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
