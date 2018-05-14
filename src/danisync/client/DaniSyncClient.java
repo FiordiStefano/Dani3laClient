@@ -12,7 +12,11 @@ import java.awt.HeadlessException;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Socket;
 import javax.swing.JButton;
@@ -24,7 +28,6 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import static javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE;
 import javax.swing.text.DefaultCaret;
-import packet.protoPacket.data;
 import packet.protoPacket.crcInfo;
 import packet.protoPacket.crcReq;
 import packet.protoPacket.resp;
@@ -45,7 +48,7 @@ public class DaniSyncClient extends JFrame {
     JButton calcButton;
     JButton conButton;
     JButton syncButton;
-    File syncFolder;
+    File syncDir;
     Thread thCalcCRC;
     Thread thConnect;
     Thread thSync;
@@ -60,12 +63,17 @@ public class DaniSyncClient extends JFrame {
         int y = (Toolkit.getDefaultToolkit().getScreenSize().height * 20) / 100;
         super.setBounds(x, y, width, heigth);
         super.setResizable(false);
-        super.setTitle("DaniSync - Client");
+        super.setTitle("Dani3la");
         super.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         super.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
                 if (JOptionPane.showConfirmDialog(DaniSyncClient.this, "Sei sicuro di voler uscire?", "Esci", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
+                    try {
+                        writeConfig();
+                    } catch (IOException ex) {
+                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Salvataggio configurazione fallito");
+                    }
                     System.exit(0);
                 }
             }
@@ -104,17 +112,17 @@ public class DaniSyncClient extends JFrame {
                 int result = dirChooser.showOpenDialog(null);
                 if (result == JFileChooser.APPROVE_OPTION) {
                     if (dirChooser.getSelectedFile().exists()) {
-                        syncFolder = dirChooser.getSelectedFile();
-                        folderText.setText(syncFolder.getPath());
+                        syncDir = dirChooser.getSelectedFile();
+                        folderText.setText(syncDir.getPath());
                         int nFiles = 0;
-                        for (File f : syncFolder.listFiles()) {
+                        for (File f : syncDir.listFiles()) {
                             if (!f.isDirectory()) {
                                 nFiles++;
                             }
                         }
                         Files = new FileHandlerClient[nFiles];
                         int i = 0;
-                        for (File f : syncFolder.listFiles()) {
+                        for (File f : syncDir.listFiles()) {
                             if (!f.isDirectory()) {
                                 try {
                                     Files[i] = new FileHandlerClient(f, ChunkSize);
@@ -220,18 +228,28 @@ public class DaniSyncClient extends JFrame {
         syncButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (Files != null) {
-                    if (checkCRCIndexes()) {
-                        synchronize();
-                        thSync.start();
+                if (thSync == null || !thSync.isAlive()) {
+                    if (Files != null) {
+                        if (checkCRCIndexes()) {
+                            synchronize();
+                            thSync.start();
+                        } else {
+                            JOptionPane.showMessageDialog(DaniSyncClient.this, "Uno o più file indice mancanti");
+                        }
                     } else {
-                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Uno o più file indice mancanti");
+                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
                     }
                 } else {
-                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
+                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Sincronizzazione già in corso");
                 }
             }
         });
+
+        try {
+            readConfig();
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(DaniSyncClient.this, "Caricamento configurazione fallito");
+        }
     }
 
     private void calculateCRC() {
@@ -280,6 +298,7 @@ public class DaniSyncClient extends JFrame {
                 try {
                     socket.close();
                     conButton.setText("Connetti");
+                    syncButton.setEnabled(false);
                 } catch (IOException ex) {
                 }
             }
@@ -292,13 +311,15 @@ public class DaniSyncClient extends JFrame {
             public void run() {
                 try {
                     createCRCInfoPacket().writeDelimitedTo(socket.getOutputStream());
-
+                    monitor.append("Inizio sincronizzazione...\n");
                     while (true) {
                         crcReq request = crcReq.parseDelimitedFrom(socket.getInputStream());
                         if (request.getCrc().equals("end")) {
                             resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
+                            monitor.append("Fine trasferimento file indice\n");
                             break;
                         }
+                        monitor.append("Invio " + request.getCrc() + "...\n");
                         for (int i = 0; i < Files.length; i++) {
                             if (Files[i].crcIndex.getName().equals(request.getCrc()) && Files[i].version == request.getVer()) {
                                 Files[i].getCRCIndexInfoPacket().writeDelimitedTo(socket.getOutputStream());
@@ -306,9 +327,9 @@ public class DaniSyncClient extends JFrame {
                                 resp infoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
                                 if (infoRespPacket.getRes().equals("ok")) {
                                     monitor.append("Inizio trasferimento " + Files[i].crcIndex.getName() + "...\n");
-                                    int errors = 0, j;
+                                    int errors = 0, j = 0;
                                     OUTER:
-                                    for (j = infoRespPacket.getInd(); j < Files[i].nCRCIndexPackets; j++) {
+                                    for (; j < Files[i].nCRCIndexPackets; j++) {
                                         try {
                                             Files[i].buildCRCIndexPacket(j).writeDelimitedTo(socket.getOutputStream());
                                             errors = 0;
@@ -426,7 +447,7 @@ public class DaniSyncClient extends JFrame {
                                     }
                                     if (j == Files[i].nChunkPackets) {
                                         resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
-                                        monitor.append("Trasferimento completato");
+                                        monitor.append("Trasferimento completato\n");
                                     } else {
                                         resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
                                         monitor.append("Trasferimento fallito\n");
@@ -439,6 +460,8 @@ public class DaniSyncClient extends JFrame {
                     }
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
+                    conButton.setText("Connetti");
+                    syncButton.setEnabled(false);
                 }
                 try {
                     socket.close();
@@ -446,6 +469,64 @@ public class DaniSyncClient extends JFrame {
                 }
             }
         });
+    }
+
+    /**
+     * Scrive la configurazione del client sul file cConfig.ini
+     *
+     * @throws IOException se ci sono errori durante la scrittura
+     */
+    public void writeConfig() throws IOException {
+        if (syncDir != null) {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(new File("cConfig.ini"), false));
+            String s = "Path = " + syncDir.getAbsolutePath();
+            writer.write(s);
+
+            writer.close();
+        }
+    }
+
+    /**
+     * Legge la configurazione del client dal file cConfig.ini
+     *
+     * @throws IOException se ci sono errori durante la lettura
+     */
+    public void readConfig() throws IOException {
+        if (new File("cConfig.ini").exists()) {
+            BufferedReader reader = new BufferedReader(new FileReader(new File("cConfig.ini")));
+            String s = reader.readLine();
+            if (s.contains("Path = ")) {
+                syncDir = new File(s.split(" = ")[1]);
+                if (!syncDir.exists() || !syncDir.isDirectory()) {
+                    syncDir = null;
+                } else if (syncDir.exists() && syncDir.isDirectory()) {
+                    folderText.setText(syncDir.getAbsolutePath());
+                    int nFiles = 0;
+                    for (File f : syncDir.listFiles()) {
+                        if (!f.isDirectory()) {
+                            nFiles++;
+                        }
+                    }
+                    Files = new FileHandlerClient[nFiles];
+                    int i = 0;
+                    for (File f : syncDir.listFiles()) {
+                        if (!f.isDirectory()) {
+                            try {
+                                Files[i] = new FileHandlerClient(f, ChunkSize);
+                                if (Files[i].crcIndex.exists()) {
+                                    monitor.append("Letto file indice " + Files[i].crcIndex.getName() + " | Codice versione: " + Files[i].version + "\n");
+                                }
+                                i++;
+                            } catch (IOException | MyExc ex) {
+                                JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
+                            }
+                        }
+                    }
+                }
+            }
+
+            reader.close();
+        }
     }
 
     private boolean checkCRCIndexes() {
@@ -463,12 +544,12 @@ public class DaniSyncClient extends JFrame {
                 .setCsz(ChunkSize)
                 .build();
 
-        int i = 0;
         for (FileHandlerClient fhc : Files) {
             packet = packet.toBuilder()
-                    .setLen(i, fhc.ClientFile.length())
-                    .setCrc(i, fhc.ClientFile.getName())
-                    .setVer(i, fhc.version)
+                    .addLen(fhc.ClientFile.length())
+                    .addCrc(fhc.ClientFile.getName())
+                    .addVer(fhc.version)
+                    .addCln(fhc.crcIndex.length())
                     .build();
         }
 

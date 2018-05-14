@@ -101,7 +101,7 @@ public class FileHandlerClient {
         this.ChunkSize = ChunkSize;
         this.fcClient = new FileInputStream(this.ClientFile).getChannel();
 
-        if (this.ClientFile.length() % 2 == 0) {
+        if (this.ClientFile.length() % this.ChunkSize == 0) {
             //nPackets = this.ClientFile.length() / PacketLength;
             nChunks = this.ClientFile.length() / this.ChunkSize;
         } else {
@@ -109,11 +109,14 @@ public class FileHandlerClient {
             nChunks = this.ClientFile.length() / this.ChunkSize + 1;
         }
 
+        if (!new File("Indexes\\").exists()) {
+            new File("Indexes\\").mkdir();
+        }
         this.crcIndex = new File("Indexes\\" + this.ClientFile.getName() + ".crc");
         this.fcCRCIndex = new FileInputStream(this.crcIndex).getChannel();
         if (this.crcIndex.exists()) {
             readDigests();
-            if (this.crcIndex.length() % 2 == 0) {
+            if (this.crcIndex.length() % this.PacketLength == 0) {
                 nCRCIndexPackets = this.crcIndex.length() / PacketLength;
             } else {
                 nCRCIndexPackets = this.crcIndex.length() / PacketLength + 1;
@@ -130,6 +133,7 @@ public class FileHandlerClient {
         return info.newBuilder()
                 .setNam(crcIndex.getName())
                 .setLen(crcIndex.length())
+                .setVer(version)
                 .build();
     }
 
@@ -166,16 +170,15 @@ public class FileHandlerClient {
             int len;
             if ((len = fcClient.read(buf, (long) index * ChunkSize)) != -1) {
                 ChunkToSend = getByteArray(buf);
-            }
-
-            if (ChunkToSend.length % 2 == 0) {
-                nChunkPackets = ChunkToSend.length / PacketLength;
-            } else {
-                nChunkPackets = ChunkToSend.length / PacketLength + 1;
+                if (ChunkToSend.length % this.PacketLength == 0) {
+                    nChunkPackets = ChunkToSend.length / PacketLength;
+                } else {
+                    nChunkPackets = ChunkToSend.length / PacketLength + 1;
+                }
             }
         }
     }
-    
+
     protected info getChunkInfoPacket(int index) {
         return info.newBuilder()
                 .setNam(ClientFile.getName())
@@ -257,7 +260,6 @@ public class FileHandlerClient {
             throw new MyExc("Error while reading packet from file");
         }
     }*/
-    
     /**
      * Calcola i digest e li scrive su un file .crc
      *
@@ -273,7 +275,7 @@ public class FileHandlerClient {
             digests[0] = CRC32Hashing(Files.readAllBytes(ClientFile.toPath()));
         }
         writeDigests();
-        if (this.crcIndex.length() % 2 == 0) {
+        if (this.crcIndex.length() % this.PacketLength == 0) {
             nCRCIndexPackets = this.crcIndex.length() / PacketLength;
         } else {
             nCRCIndexPackets = this.crcIndex.length() / PacketLength + 1;
