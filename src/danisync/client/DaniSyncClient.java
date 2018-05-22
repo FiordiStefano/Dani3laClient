@@ -18,7 +18,11 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -52,17 +56,17 @@ public class DaniSyncClient extends JFrame {
     Thread thCalcCRC;
     Thread thConnect;
     Thread thSync;
-    Socket socket;
+    Socket[] sockets;
     int ChunkSize = 1024 * 1024;
     FileHandlerClient[] Files;
 
     public DaniSyncClient() throws HeadlessException {
         int width = (Toolkit.getDefaultToolkit().getScreenSize().width * 34) / 100;
-        int heigth = (Toolkit.getDefaultToolkit().getScreenSize().height * 20) / 100;
+        int heigth = (Toolkit.getDefaultToolkit().getScreenSize().height * 25) / 100;
         int x = (Toolkit.getDefaultToolkit().getScreenSize().width * 33) / 100;
         int y = (Toolkit.getDefaultToolkit().getScreenSize().height * 20) / 100;
         super.setBounds(x, y, width, heigth);
-        super.setResizable(false);
+        //super.setResizable(false);
         super.setTitle("Dani3la");
         super.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         super.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -114,7 +118,7 @@ public class DaniSyncClient extends JFrame {
                     if (dirChooser.getSelectedFile().exists()) {
                         syncDir = dirChooser.getSelectedFile();
                         dirText.setText(syncDir.getPath());
-                        int nFiles = 0;
+                        /*int nFiles = 0;
                         for (File f : syncDir.listFiles()) {
                             if (!f.isDirectory()) {
                                 nFiles++;
@@ -126,15 +130,15 @@ public class DaniSyncClient extends JFrame {
                             if (!f.isDirectory()) {
                                 try {
                                     Files[i] = new FileHandlerClient(f, ChunkSize);
-                                    /*if (Files[i].crcIndex.exists()) {
-                                        monitor.append("Letto file indice " + Files[i].crcIndex.getName() + " | Codice versione: " + Files[i].version + "\n");
-                                    }*/
+                                    //if (Files[i].crcIndex.exists()) {
+                                    //    monitor.append("Letto file indice " + Files[i].crcIndex.getName() + " | Codice versione: " + Files[i].version + "\n");
+                                    //}
                                     i++;
                                 } catch (IOException | MyExc ex) {
                                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
                                 }
                             }
-                        }
+                        }*/
                     } else {
                         JOptionPane.showMessageDialog(DaniSyncClient.this, "Directory inesistente");
                     }
@@ -155,7 +159,7 @@ public class DaniSyncClient extends JFrame {
         gbc.gridwidth = 3;
         pane.add(monitorScroll, gbc);
 
-        calcButton = new JButton("Calcola CRC");
+        calcButton = new JButton("Genera indice");
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.5;
         gbc.weighty = 0.0;
@@ -171,28 +175,20 @@ public class DaniSyncClient extends JFrame {
                         try {
                             thCalcCRC.interrupt();
                             monitor.append("Operazione annullata\n");
-                            calcButton.setText("Calcola CRC");
+                            calcButton.setText("Genera indice");
                         } catch (SecurityException ex) {
                             JOptionPane.showMessageDialog(DaniSyncClient.this, "Impossibile annullare l'operazione");
                         }
                     }
                 } else {
-                    if (Files != null) {
-                        if (Files.length != 0) {
-                            calculateCRC();
-                            thCalcCRC.start();
-                            calcButton.setText("Annulla");
-                        } else {
-                            JOptionPane.showMessageDialog(DaniSyncClient.this, "Nessun file trovato");
-                        }
-                    } else {
-                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
-                    }
+                    calculateCRC();
+                    thCalcCRC.start();
+                    calcButton.setText("Annulla");
                 }
             }
         });
 
-        conButton = new JButton("Connetti");
+        /*conButton = new JButton("Connetti");
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.5;
         gbc.weighty = 0.0;
@@ -214,10 +210,9 @@ public class DaniSyncClient extends JFrame {
                     disconnect();
                 }
             }
-        });
-
+        });*/
         syncButton = new JButton("Sincronizza");
-        syncButton.setEnabled(false);
+        //syncButton.setEnabled(false);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 0.5;
         gbc.weighty = 0.0;
@@ -237,7 +232,7 @@ public class DaniSyncClient extends JFrame {
                             JOptionPane.showMessageDialog(DaniSyncClient.this, "Uno o più file indice mancanti");
                         }
                     } else {
-                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Cartella non selezionata o non valida");
+                        JOptionPane.showMessageDialog(DaniSyncClient.this, "File indice non generati");
                     }
                 } else {
                     JOptionPane.showMessageDialog(DaniSyncClient.this, "Sincronizzazione già in corso");
@@ -256,6 +251,25 @@ public class DaniSyncClient extends JFrame {
         thCalcCRC = new Thread(new Runnable() {
             @Override
             public void run() {
+                int nFiles = 0;
+                for (File f : syncDir.listFiles()) {
+                    if (!f.isDirectory()) {
+                        nFiles++;
+                    }
+                }
+                Files = new FileHandlerClient[nFiles];
+                int i = 0;
+                for (File f : syncDir.listFiles()) {
+                    if (!f.isDirectory()) {
+                        try {
+                            Files[i] = new FileHandlerClient(f, ChunkSize);
+                            i++;
+                        } catch (IOException | MyExc ex) {
+                            JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
+                        }
+                    }
+                }
+
                 monitor.append("Inizio indicizzazione...\n");
                 if (!new File("Indexes\\").exists()) {
                     new File("Indexes\\").mkdir();
@@ -270,12 +284,12 @@ public class DaniSyncClient extends JFrame {
                     }
                 }
                 monitor.append("Fine indicizzazione\n");
-                calcButton.setText("Calcola CRC");
+                calcButton.setText("Genera indice");
             }
         });
     }
 
-    private void connect() {
+    /*private void connect() {
         thConnect = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -289,190 +303,167 @@ public class DaniSyncClient extends JFrame {
                 }
             }
         });
-    }
-
-    private void disconnect() {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    socket.close();
-                    conButton.setText("Connetti");
-                    syncButton.setEnabled(false);
-                } catch (IOException ex) {
-                }
-            }
-        }).start();
-    }
-
+    }*/
     private void synchronize() {
         thSync = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    createCRCInfoPacket().writeDelimitedTo(socket.getOutputStream());
-                    monitor.append("Inizio sincronizzazione...\n");
-                    while (true) {
-                        crcReq request = crcReq.parseDelimitedFrom(socket.getInputStream());
-                        if (request.getCrc().equals("end")) {
-                            resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
-                            monitor.append("Fine trasferimento file indice\n");
-                            break;
-                        }
-                        monitor.append("Invio " + request.getCrc() + "...\n");
-                        for (int i = 0; i < Files.length; i++) {
-                            if (Files[i].crcIndex.getName().equals(request.getCrc()) && Files[i].version == request.getVer()) {
-                                Files[i].getCRCIndexInfoPacket().writeDelimitedTo(socket.getOutputStream());
-
-                                resp infoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
-                                if (infoRespPacket.getRes().equals("ok")) {
-                                    monitor.append("Inizio trasferimento " + Files[i].crcIndex.getName() + "...\n");
-                                    int errors = 0, j = 0;
-                                    OUTER:
-                                    for (; j < Files[i].nCRCIndexPackets; j++) {
-                                        try {
-                                            Files[i].buildCRCIndexPacket(j).writeDelimitedTo(socket.getOutputStream());
-                                            errors = 0;
-                                            resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
-                                            switch (respPacket.getRes()) {
-                                                case "wp":
-                                                    j = respPacket.getInd() - 1;
-                                                    break;
-                                                case "mrr":
-                                                    monitor.append("Errore di trasferimento\n");
-                                                    break OUTER;
-                                            }
-                                        } catch (MyExc | IOException ex) {
-                                            if (errors == 3) {
-                                                monitor.append("Errore di lettura: impossibile trasferire il file\n");
+                    sockets = new Socket[1];
+                    int z = 0;
+                    monitor.append("Indirizzo IP corrente: " + InetAddress.getLocalHost() + "\n");
+                    byte[] bAddress = InetAddress.getLocalHost().getAddress();
+                    for (int s = 1; s < 255; s++) {
+                        try {
+                            bAddress[3] = new Integer(s).byteValue();
+                            InetAddress address = InetAddress.getByAddress(bAddress);
+                            sockets[z] = new Socket();
+                            sockets[z].connect(new InetSocketAddress(address, 6365), 3000);
+                            monitor.append("Host connesso: " + sockets[z].getRemoteSocketAddress() + "\n");
+                            final int t = z;
+                            new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    int p = t;
+                                    try {
+                                        createCRCInfoPacket().writeDelimitedTo(sockets[p].getOutputStream());
+                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Inizio sincronizzazione...\n");
+                                        while (true) {
+                                            crcReq request = crcReq.parseDelimitedFrom(sockets[p].getInputStream());
+                                            if (request.getCrc().equals("end")) {
+                                                resp.newBuilder().setRes("ok").build().writeDelimitedTo(sockets[p].getOutputStream());
+                                                monitor.append(sockets[p].getRemoteSocketAddress() + ": Fine trasferimento file indice\n");
                                                 break;
-                                            } else {
-                                                errors++;
-                                                j--;
                                             }
-                                        }
-                                    }
-                                    if (j == Files[i].nCRCIndexPackets) {
-                                        /*monitor.append("Trasferimento completato con successo\n");
-                                        Files[i].getInfoPacket().writeDelimitedTo(socket.getOutputStream());
+                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Invio " + request.getCrc() + "...\n");
+                                            for (int i = 0; i < Files.length; i++) {
+                                                if (Files[i].crcIndex.getName().equals(request.getCrc()) && Files[i].version == request.getVer()) {
+                                                    Files[i].getCRCIndexInfoPacket().writeDelimitedTo(sockets[p].getOutputStream());
 
-                                        resp fInfoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
-                                        if (fInfoRespPacket.getRes().equals("ok")) {
-                                            monitor.append("Inizio trasferimento " + Files[i].ClientFile.getName() + "...\n");
-                                            int fErrors = 0, k;
-                                            OUTER:
-                                            for (k = fInfoRespPacket.getInd(); k < Files[i].nPackets; k++) {
-                                                try {
-                                                    Files[i].buildPacket(k).writeDelimitedTo(socket.getOutputStream());
-                                                    fErrors = 0;
-                                                    resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
-                                                    switch (respPacket.getRes()) {
-                                                        case "wp":
-                                                            k = respPacket.getInd() - 1;
-                                                            break;
-                                                        case "mrr":
-                                                            monitor.append("Errore di trasferimento\n");
-                                                            break OUTER;
+                                                    resp infoRespPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
+                                                    if (infoRespPacket.getRes().equals("ok")) {
+                                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Inizio trasferimento " + Files[i].crcIndex.getName() + "...\n");
+                                                        int errors = 0, j = 0;
+                                                        OUTER:
+                                                        for (; j < Files[i].nCRCIndexPackets; j++) {
+                                                            try {
+                                                                Files[i].buildCRCIndexPacket(j).writeDelimitedTo(sockets[p].getOutputStream());
+                                                                errors = 0;
+                                                                resp respPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
+                                                                switch (respPacket.getRes()) {
+                                                                    case "wp":
+                                                                        j = respPacket.getInd() - 1;
+                                                                        break;
+                                                                    case "mrr":
+                                                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di trasferimento\n");
+                                                                        break OUTER;
+                                                                }
+                                                            } catch (MyExc | IOException ex) {
+                                                                if (errors == 3) {
+                                                                    monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di lettura: impossibile trasferire il file\n");
+                                                                    break;
+                                                                } else {
+                                                                    errors++;
+                                                                    j--;
+                                                                }
+                                                            }
+                                                        }
+                                                        if (j == Files[i].nCRCIndexPackets) {
+                                                            resp.newBuilder().setRes("ok").build().writeDelimitedTo(sockets[p].getOutputStream());
+                                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento file indice completato\n");
+                                                        } else {
+                                                            resp.newBuilder().setRes("not").build().writeDelimitedTo(sockets[p].getOutputStream());
+                                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento file indice fallito\n");
+                                                        }
                                                     }
-                                                } catch (MyExc | IOException ex) {
-                                                    if (fErrors == 3) {
-                                                        monitor.append("Errore di lettura: impossibile trasferire il file\n");
-                                                        data.newBuilder().setNum(-1);
-                                                        break;
-                                                    } else {
-                                                        fErrors++;
-                                                        k--;
-                                                    }
+
+                                                    break;
                                                 }
                                             }
-                                            if (k == Files[i].nPackets) {
-                                                monitor.append("Trasferimento completato con successo\n");
-                                                resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
-                                            } else {
-                                                monitor.append("Trasferimento fallito\n");
-                                                resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
-                                            }
                                         }
-                                    } else {*/
-                                        resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
-                                        monitor.append("Trasferimento file crc completato\n");
-                                    } else {
-                                        resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
-                                        monitor.append("Trasferimento file crc fallito\n");
-                                    }
-                                }
 
-                                break;
-                            }
-                        }
-                    }
-
-                    while (true) {
-                        chunkReq chunkReqPacket = chunkReq.parseDelimitedFrom(socket.getInputStream());
-                        if (chunkReqPacket.getInd() == -1) {
-                            break;
-                        }
-                        for (int i = 0; i < Files.length; i++) {
-                            if (chunkReqPacket.getNam().equals(Files[i].ClientFile.getName())) {
-                                monitor.append("Invio pezzo n." + chunkReqPacket.getInd() + " del file " + chunkReqPacket.getNam() + "...\n");
-                                Files[i].setChunkToSend(chunkReqPacket.getInd());
-                                Files[i].getChunkInfoPacket(chunkReqPacket.getInd()).writeDelimitedTo(socket.getOutputStream());
-
-                                resp chunkInfoRespPacket = resp.parseDelimitedFrom(socket.getInputStream());
-                                if (chunkInfoRespPacket.getRes().equals("ok")) {
-                                    int errors = 0, j;
-                                    OUTER:
-                                    for (j = 0; j < Files[i].nChunkPackets; j++) {
-                                        try {
-                                            Files[i].buildChunkPacket(j).writeDelimitedTo(socket.getOutputStream());
-                                            errors = 0;
-                                            resp respPacket = resp.parseDelimitedFrom(socket.getInputStream());
-                                            switch (respPacket.getRes()) {
-                                                case "wp":
-                                                    j = respPacket.getInd() - 1;
-                                                    break;
-                                                case "mrr":
-                                                    monitor.append("Errore di trasferimento\n");
-                                                    break OUTER;
-                                            }
-                                        } catch (MyExc | IOException ex) {
-                                            if (errors == 3) {
-                                                monitor.append("Errore di lettura: impossibile trasferire il file\n");
+                                        while (true) {
+                                            chunkReq chunkReqPacket = chunkReq.parseDelimitedFrom(sockets[p].getInputStream());
+                                            if (chunkReqPacket.getInd() == -1) {
                                                 break;
-                                            } else {
-                                                errors++;
-                                                j--;
+                                            }
+                                            for (int i = 0; i < Files.length; i++) {
+                                                if (chunkReqPacket.getNam().equals(Files[i].ClientFile.getName())) {
+                                                    monitor.append(sockets[p].getRemoteSocketAddress() + ": Invio pezzo n." + chunkReqPacket.getInd() + " del file " + chunkReqPacket.getNam() + "...\n");
+                                                    Files[i].setChunkToSend(chunkReqPacket.getInd());
+                                                    Files[i].getChunkInfoPacket(chunkReqPacket.getInd()).writeDelimitedTo(sockets[p].getOutputStream());
+
+                                                    resp chunkInfoRespPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
+                                                    if (chunkInfoRespPacket.getRes().equals("ok")) {
+                                                        int errors = 0, j;
+                                                        OUTER:
+                                                        for (j = 0; j < Files[i].nChunkPackets; j++) {
+                                                            try {
+                                                                Files[i].buildChunkPacket(j).writeDelimitedTo(sockets[p].getOutputStream());
+                                                                errors = 0;
+                                                                resp respPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
+                                                                switch (respPacket.getRes()) {
+                                                                    case "wp":
+                                                                        j = respPacket.getInd() - 1;
+                                                                        break;
+                                                                    case "mrr":
+                                                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di trasferimento\n");
+                                                                        break OUTER;
+                                                                }
+                                                            } catch (MyExc | IOException ex) {
+                                                                if (errors == 3) {
+                                                                    monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di lettura: impossibile trasferire il file\n");
+                                                                    break;
+                                                                } else {
+                                                                    errors++;
+                                                                    j--;
+                                                                }
+                                                            }
+                                                        }
+                                                        if (j == Files[i].nChunkPackets) {
+                                                            resp.newBuilder().setRes("ok").build().writeDelimitedTo(sockets[p].getOutputStream());
+                                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento completato\n");
+                                                        } else {
+                                                            resp.newBuilder().setRes("not").build().writeDelimitedTo(sockets[p].getOutputStream());
+                                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento fallito\n");
+                                                        }
+                                                    }
+
+                                                    break;
+                                                }
                                             }
                                         }
+
+                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Sincronizzazione completata\n");
+                                    } catch (IOException ex) {
+                                        JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
+                                        //conButton.setText("Connetti");
+                                        //syncButton.setEnabled(false);
                                     }
-                                    if (j == Files[i].nChunkPackets) {
-                                        resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
-                                        monitor.append("Trasferimento completato\n");
-                                    } else {
-                                        resp.newBuilder().setRes("not").build().writeDelimitedTo(socket.getOutputStream());
-                                        monitor.append("Trasferimento fallito\n");
+                                    monitor.append("Host disconnesso: " + sockets[p].getRemoteSocketAddress());
+                                    try {
+                                        sockets[p].close();
+                                    } catch (IOException ex) {
                                     }
                                 }
+                            }).start();
 
-                                break;
-                            }
+                            z++;
+                            sockRealloc(z);
+                        } catch (IOException ex) {
                         }
                     }
-                    
-                    monitor.append("Sincronizzazione completata\n");
-                } catch (IOException ex) {
-                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di connessione");
-                    conButton.setText("Connetti");
-                    syncButton.setEnabled(false);
+                } catch (UnknownHostException ex) {
+                    JOptionPane.showMessageDialog(DaniSyncClient.this, "Impossible trovare indirizzo IP corrente");
                 }
-                /*try {
-                    socket.close();
-                    conButton.setText("Connetti");
-                    syncButton.setEnabled(false);
-                } catch (IOException ex) {
-                }*/
             }
         });
+    }
+
+    private void sockRealloc(int newLength) {
+        Socket[] newArray = new Socket[newLength];
+        System.arraycopy(sockets, 0, newArray, 0, sockets.length);
+        sockets = newArray;
     }
 
     /**
@@ -505,27 +496,6 @@ public class DaniSyncClient extends JFrame {
                     syncDir = null;
                 } else if (syncDir.exists() && syncDir.isDirectory()) {
                     dirText.setText(syncDir.getAbsolutePath());
-                    int nFiles = 0;
-                    for (File f : syncDir.listFiles()) {
-                        if (!f.isDirectory()) {
-                            nFiles++;
-                        }
-                    }
-                    Files = new FileHandlerClient[nFiles];
-                    int i = 0;
-                    for (File f : syncDir.listFiles()) {
-                        if (!f.isDirectory()) {
-                            try {
-                                Files[i] = new FileHandlerClient(f, ChunkSize);
-                                /*if (Files[i].crcIndex.exists()) {
-                                    monitor.append("Letto file indice " + Files[i].crcIndex.getName() + " | Codice versione: " + Files[i].version + "\n");
-                                }*/
-                                i++;
-                            } catch (IOException | MyExc ex) {
-                                JOptionPane.showMessageDialog(DaniSyncClient.this, "Errore di lettura file");
-                            }
-                        }
-                    }
                 }
             }
 
