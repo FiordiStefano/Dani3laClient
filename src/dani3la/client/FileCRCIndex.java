@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package danisync.client;
+package dani3la.client;
 
 /**
  * Classe che implementa il metodo nativo (c++) della libreria FileCRCIndex.dll

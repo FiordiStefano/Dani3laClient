@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package danisync.client;
+package dani3la.client;
 
 import com.google.protobuf.ByteString;
 import java.io.BufferedReader;
@@ -269,8 +269,18 @@ public class FileHandlerClient {
      */
     protected void FileIndexing() throws IOException, MyExc {
         if (ClientFile.length() > ChunkSize) {
-            FileCRCIndex fciClient = new FileCRCIndex(ClientFile.getAbsolutePath(), ChunkSize, nChunks, ClientFile.length());
-            digests = fciClient.calcDigests();
+            //FileCRCIndex fciClient = new FileCRCIndex(ClientFile.getAbsolutePath(), ChunkSize, nChunks, ClientFile.length());
+            //digests = fciClient.calcDigests();
+            digests = new long[(int) nChunks];
+            int len;
+            ByteBuffer buf = ByteBuffer.allocate(ChunkSize);
+            for (int i = 0; i < digests.length; i++) {
+                if ((len = fcClient.read(buf, i * ChunkSize)) != -1) {
+                    digests[i] = CRC32Hashing(getByteArray(buf));
+                } else {
+                    throw new MyExc("Indexing error");
+                }
+            }
         } else {
             digests = new long[1];
             digests[0] = CRC32Hashing(Files.readAllBytes(ClientFile.toPath()));
