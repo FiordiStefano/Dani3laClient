@@ -18,6 +18,8 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
+import javax.swing.JProgressBar;
+import javax.swing.JTextArea;
 import packet.protoPacket.data;
 import packet.protoPacket.info;
 
@@ -83,6 +85,10 @@ public class FileHandlerClient {
      * Versione del file determinata dal crc calcolato sul file indice
      */
     protected long version;
+    /**
+     * Progress bar per l'indicizzazione del file;
+     */
+    JProgressBar indProg;
 
     /**
      * Costruttore che crea il FileChannel di lettura sul file, calcola il
@@ -91,12 +97,14 @@ public class FileHandlerClient {
      *
      * @param ClientFile il file da sincronizzare
      * @param ChunkSize la grandezza dei pezzi
+     * @param indProg progress bar per l'indicizzazione
      * @throws IOException se la creazione del canale non va a buon fine
      * @throws NumberFormatException se ci sono errori di lettura del file
      * indice
      * @throws MyExc se c'è un errore nella lettura della versione
      */
-    public FileHandlerClient(File ClientFile, int ChunkSize) throws IOException, NumberFormatException, MyExc {
+    public FileHandlerClient(File ClientFile, int ChunkSize, JProgressBar indProg) throws IOException, NumberFormatException, MyExc {
+        this.indProg = indProg;
         this.ClientFile = ClientFile;
         this.ChunkSize = ChunkSize;
         this.fcClient = new FileInputStream(this.ClientFile).getChannel();
@@ -274,16 +282,21 @@ public class FileHandlerClient {
             digests = new long[(int) nChunks];
             int len;
             ByteBuffer buf = ByteBuffer.allocate(ChunkSize);
+            indProg.setMaximum(digests.length);
             for (int i = 0; i < digests.length; i++) {
-                if ((len = fcClient.read(buf, i * ChunkSize)) != -1) {
+                if ((len = fcClient.read(buf, (long) i * ChunkSize)) != -1) {
                     digests[i] = CRC32Hashing(getByteArray(buf));
+                    indProg.setValue(i);
                 } else {
                     throw new MyExc("Indexing error");
                 }
             }
+            indProg.setValue(digests.length);
         } else {
+            indProg.setMaximum(1);
             digests = new long[1];
             digests[0] = CRC32Hashing(Files.readAllBytes(ClientFile.toPath()));
+            indProg.setValue(1);
         }
         writeDigests();
         this.fcCRCIndex = new FileInputStream(this.crcIndex).getChannel();
@@ -292,6 +305,7 @@ public class FileHandlerClient {
         } else {
             nCRCIndexPackets = this.crcIndex.length() / PacketLength + 1;
         }
+        indProg.setValue(0);
     }
 
     /**
@@ -363,7 +377,7 @@ public class FileHandlerClient {
      * differenti da numeri
      * @throws MyExc se la versione non viene letta correttamente
      */
-    private void readDigests() throws IOException, NumberFormatException, MyExc {
+    protected void readDigests() throws IOException, NumberFormatException, MyExc {
         BufferedReader reader = new BufferedReader(new FileReader(crcIndex));
         char[] s = new char[10];
         digests = new long[(int) nChunks];
@@ -374,11 +388,21 @@ public class FileHandlerClient {
             }
         }
 
-        if ((len = reader.read(s)) != -1) {
-            version = Long.parseLong(new String(s));
+        if (digests.length > 1) {
+            if ((len = reader.read(s)) != -1) {
+                version = Long.parseLong(new String(s));
+            } else {
+                throw new MyExc("Error while reading file version");
+            }
         } else {
-            throw new MyExc("Error while reading file version");
+            version = digests[0];
         }
         reader.close();
+        this.fcCRCIndex = new FileInputStream(this.crcIndex).getChannel();
+        if (this.crcIndex.length() % this.PacketLength == 0) {
+            nCRCIndexPackets = this.crcIndex.length() / PacketLength;
+        } else {
+            nCRCIndexPackets = this.crcIndex.length() / PacketLength + 1;
+        }
     }
 }

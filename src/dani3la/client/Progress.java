@@ -40,7 +40,7 @@ public class Progress extends JFrame {
     public Progress() throws HeadlessException {
         int width = (Toolkit.getDefaultToolkit().getScreenSize().width * 34) / 100;
         int heigth = (Toolkit.getDefaultToolkit().getScreenSize().height * 50) / 100;
-        int x = (Toolkit.getDefaultToolkit().getScreenSize().width * 33) / 100;
+        int x = (Toolkit.getDefaultToolkit().getScreenSize().width * 60) / 100;
         int y = (Toolkit.getDefaultToolkit().getScreenSize().height * 20) / 100;
         super.setBounds(x, y, width, heigth);
         super.setMinimumSize(new Dimension(300, 150));
@@ -62,24 +62,6 @@ public class Progress extends JFrame {
         gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
         comps = new Component[0];
-
-        /*comps = new Component[1];
-        comps[0] = new JButton("Add row");
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.PAGE_START;
-        gbc.weighty = 1;
-        gbc.weightx = 1;
-        gbc.gridy = 0;
-        gbc.gridwidth = 3;
-        gbc.ipady = 10;
-        //gbc.insets = new Insets(20, 10, 10, 10);
-        pane.add(comps[0], gbc);
-        ((JButton)comps[0]).addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                addRow(pane, gbc, "192.168.120.224");
-            }
-        });*/
     }
 
     /**
@@ -102,6 +84,7 @@ public class Progress extends JFrame {
      * Metodo che accoda una nuova riga
      * 
      * @param s la stringa della nuova label
+     * @param maxVal valore massimo progress bar
      * @return l'indice dei nuovi componenti
      */
     protected int addRow(String s, int maxVal) {

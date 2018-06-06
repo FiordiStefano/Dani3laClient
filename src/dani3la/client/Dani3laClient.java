@@ -20,8 +20,16 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Enumeration;
+import javafx.util.converter.LocalDateTimeStringConverter;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -53,14 +61,17 @@ public class Dani3laClient extends JFrame {
     JButton conButton;
     JButton syncButton;
     JButton progButton;
+    JProgressBar indProg;
+    Container pane;
     Progress progress;
+    //NetChoose netc;
     File syncDir;
     Thread thCalcCRC;
     Thread thConnect;
     Thread thSync;
-    Socket[] sockets;
     int ChunkSize = 1024 * 1024;
     FileHandlerClient[] Files;
+    InetAddress netAddress;
 
     public Dani3laClient() throws HeadlessException {
         int width = (Toolkit.getDefaultToolkit().getScreenSize().width * 34) / 100;
@@ -84,7 +95,7 @@ public class Dani3laClient extends JFrame {
                 }
             }
         });
-        Container pane = this.getContentPane();
+        pane = this.getContentPane();
         pane.setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -156,6 +167,7 @@ public class Dani3laClient extends JFrame {
                         if (thCalcCRC != null && thCalcCRC.isAlive()) {
                             try {
                                 thCalcCRC.interrupt();
+                                indProg.setVisible(false);
                                 monitor.append("Operazione annullata\n");
                                 calcButton.setText("Genera indice");
                             } catch (SecurityException ex) {
@@ -163,6 +175,15 @@ public class Dani3laClient extends JFrame {
                             }
                         }
                     } else {
+                        indProg = new JProgressBar(0, 100);
+                        gbc.fill = GridBagConstraints.HORIZONTAL;
+                        gbc.weightx = 1;
+                        gbc.weighty = 0.0;
+                        gbc.gridy = 3;
+                        gbc.ipady = 15;
+                        gbc.gridwidth = 3;
+                        pane.add(indProg, gbc);
+
                         calculateCRC();
                         thCalcCRC.start();
                         calcButton.setText("Annulla");
@@ -212,12 +233,11 @@ public class Dani3laClient extends JFrame {
         progButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (progress == null) {
-                    progress = new Progress();
-                }
                 progress.setVisible(true);
             }
         });
+
+        progress = new Progress();
 
         try {
             readConfig();
@@ -241,7 +261,7 @@ public class Dani3laClient extends JFrame {
                 for (File f : syncDir.listFiles()) {
                     if (!f.isDirectory()) {
                         try {
-                            Files[i] = new FileHandlerClient(f, ChunkSize);
+                            Files[i] = new FileHandlerClient(f, ChunkSize, indProg);
                             i++;
                         } catch (IOException | MyExc ex) {
                             JOptionPane.showMessageDialog(Dani3laClient.this, "Errore di lettura file");
@@ -249,21 +269,42 @@ public class Dani3laClient extends JFrame {
                     }
                 }
 
-                monitor.append("Inizio indicizzazione...\n");
+                monitor.append(LocalDateTime.now() + " | Inizio indicizzazione...\n");
                 if (!new File("Indexes\\").exists()) {
                     new File("Indexes\\").mkdir();
                 }
                 for (FileHandlerClient f : Files) {
-                    monitor.append("Indicizzazione di " + f.ClientFile.getName() + "\n");
-                    try {
-                        f.FileIndexing();
-                        monitor.append("Completata | Codice versione: " + f.version + "\n");
-                    } catch (IOException | MyExc ex) {
-                        monitor.append("Errore durante il calcolo\n");
+                    if (f.crcIndex.exists()) {
+                        if (JOptionPane.showConfirmDialog(Dani3laClient.this, f.crcIndex.getName() + " esiste già. Vuoi generarne uno nuovo?", "Indicizzazione", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION) {
+                            monitor.append(LocalDateTime.now() + " | Indicizzazione di " + f.ClientFile.getName() + "\n");
+                            try {
+                                f.FileIndexing();
+                                monitor.append(LocalDateTime.now() + " | " + f.crcIndex.getName() + ": Completata | Codice versione: " + f.version + "\n");
+                            } catch (IOException | MyExc ex) {
+                                monitor.append(LocalDateTime.now() + " | Errore durante il calcolo\n");
+                            }
+                        } else {
+                            try {
+                                f.readDigests();
+                                monitor.append(LocalDateTime.now() + " | " + f.crcIndex.getName() + ": Completata | Codice versione: " + f.version + "\n");
+                            } catch (IOException | MyExc ex) {
+                                JOptionPane.showMessageDialog(Dani3laClient.this, "Errore di lettura file indice");
+                            }
+                        }
+                    } else {
+                        monitor.append(LocalDateTime.now() + " | Indicizzazione di " + f.ClientFile.getName() + "\n");
+                        try {
+                            f.FileIndexing();
+                            monitor.append(LocalDateTime.now() + " | Completata | Codice versione: " + f.version + "\n");
+                        } catch (IOException | MyExc ex) {
+                            monitor.append(LocalDateTime.now() + " | Errore durante il calcolo\n");
+                        }
                     }
                 }
-                monitor.append("Fine indicizzazione\n");
+                monitor.append(LocalDateTime.now() + " | Fine indicizzazione\n");
                 calcButton.setText("Genera indice");
+
+                pane.remove(indProg);
             }
         });
     }
@@ -273,181 +314,29 @@ public class Dani3laClient extends JFrame {
             @Override
             public void run() {
                 try {
-                    sockets = new Socket[1];
-                    int z = 0;
-                    monitor.append("Indirizzo IP corrente: " + InetAddress.getLocalHost() + "\n");
-                    byte[] bAddress = InetAddress.getLocalHost().getAddress();
-                    for (int s = 1; s < 255; s++) {
-                        try {
-                            bAddress[3] = new Integer(s).byteValue();
-                            InetAddress address = InetAddress.getByAddress(bAddress);
-                            sockets[z] = new Socket();
-                            sockets[z].connect(new InetSocketAddress(address, 6365), 3000);
-                            monitor.append("Host connesso: " + sockets[z].getRemoteSocketAddress() + "\n");
-                            final int t = z;
-                            new Thread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    int p = t;
-                                    try {
-                                        createCRCInfoPacket().writeDelimitedTo(sockets[p].getOutputStream());
-                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Inizio sincronizzazione...\n");
-                                        while (true) {
-                                            crcReq request = crcReq.parseDelimitedFrom(sockets[p].getInputStream());
-                                            if (request.getCrc().equals("end")) {
-                                                resp.newBuilder().setRes("ok").build().writeDelimitedTo(sockets[p].getOutputStream());
-                                                monitor.append(sockets[p].getRemoteSocketAddress() + ": Fine trasferimento file indice\n");
-                                                break;
-                                            }
-                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Invio " + request.getCrc() + "...\n");
-                                            synchronized (this) {
-                                                for (int i = 0; i < Files.length; i++) {
-                                                    if (Files[i].crcIndex.getName().equals(request.getCrc()) && Files[i].version == request.getVer()) {
-                                                        Files[i].getCRCIndexInfoPacket().writeDelimitedTo(sockets[p].getOutputStream());
+                    if (netAddress == null) {
+                        netAddress = InetAddress.getLocalHost();
+                    }
+                    /*try {
+                        netc = new NetChoose(NetworkInterface.getNetworkInterfaces());
+                        netc.createAndShowGUI();
+                    } catch (SocketException ex) {
+                        JOptionPane.showMessageDialog(Dani3laClient.this, "Errore ricerca reti");
+                    }*/
 
-                                                        resp infoRespPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
-                                                        if (infoRespPacket.getRes().equals("ok")) {
-                                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Inizio trasferimento " + Files[i].crcIndex.getName() + "...\n");
-                                                            int errors = 0, j = 0;
-                                                            OUTER:
-                                                            for (; j < Files[i].nCRCIndexPackets; j++) {
-                                                                try {
-                                                                    Files[i].buildCRCIndexPacket(j).writeDelimitedTo(sockets[p].getOutputStream());
-                                                                    errors = 0;
-                                                                    resp respPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
-                                                                    switch (respPacket.getRes()) {
-                                                                        case "wp":
-                                                                            j = respPacket.getInd() - 1;
-                                                                            break;
-                                                                        case "mrr":
-                                                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di trasferimento\n");
-                                                                            break OUTER;
-                                                                    }
-                                                                } catch (MyExc | IOException ex) {
-                                                                    if (errors == 3) {
-                                                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di lettura: impossibile trasferire il file\n");
-                                                                        break;
-                                                                    } else {
-                                                                        errors++;
-                                                                        j--;
-                                                                    }
-                                                                }
-                                                            }
-                                                            if (j == Files[i].nCRCIndexPackets) {
-                                                                resp.newBuilder().setRes("ok").build().writeDelimitedTo(sockets[p].getOutputStream());
-                                                                monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento file indice completato\n");
-                                                            } else {
-                                                                resp.newBuilder().setRes("not").build().writeDelimitedTo(sockets[p].getOutputStream());
-                                                                monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento file indice fallito\n");
-                                                            }
-                                                        }
-
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        int rowIndex;
-                                        resp ChunksInfoPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
-                                        resp.newBuilder().setRes("ok").build().writeDelimitedTo(sockets[p].getOutputStream());
-                                        synchronized (this) {
-                                            if (progress == null) {
-                                                progress = new Progress();
-                                            }
-                                            progress.setVisible(true);
-                                            rowIndex = progress.addRow(sockets[p].getInetAddress().getHostAddress(), ChunksInfoPacket.getInd());
-                                            ((JProgressBar) progress.comps[rowIndex + 1]).setValue(0);
-                                        }
-
-                                        while (true) {
-                                            chunkReq chunkReqPacket = chunkReq.parseDelimitedFrom(sockets[p].getInputStream());
-                                            if (chunkReqPacket.getInd() == -1) {
-                                                ((JProgressBar) progress.comps[rowIndex + 1]).setValue(ChunksInfoPacket.getInd());
-                                                break;
-                                            }
-                                            synchronized (this) {
-                                                for (int i = 0; i < Files.length; i++) {
-                                                    if (chunkReqPacket.getNam().equals(Files[i].ClientFile.getName())) {
-                                                        //monitor.append(sockets[p].getRemoteSocketAddress() + ": Invio pezzo n." + chunkReqPacket.getInd() + " del file " + chunkReqPacket.getNam() + "...\n");
-                                                        Files[i].setChunkToSend(chunkReqPacket.getInd());
-                                                        Files[i].getChunkInfoPacket(chunkReqPacket.getInd()).writeDelimitedTo(sockets[p].getOutputStream());
-
-                                                        resp chunkInfoRespPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
-                                                        if (chunkInfoRespPacket.getRes().equals("ok")) {
-                                                            int errors = 0, j;
-                                                            OUTER:
-                                                            for (j = 0; j < Files[i].nChunkPackets; j++) {
-                                                                try {
-                                                                    Files[i].buildChunkPacket(j).writeDelimitedTo(sockets[p].getOutputStream());
-                                                                    errors = 0;
-                                                                    resp respPacket = resp.parseDelimitedFrom(sockets[p].getInputStream());
-                                                                    switch (respPacket.getRes()) {
-                                                                        case "wp":
-                                                                            j = respPacket.getInd() - 1;
-                                                                            break;
-                                                                        case "mrr":
-                                                                            monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di trasferimento\n");
-                                                                            break OUTER;
-                                                                    }
-                                                                } catch (MyExc | IOException ex) {
-                                                                    if (errors == 3) {
-                                                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Errore di lettura: impossibile trasferire il file\n");
-                                                                        break;
-                                                                    } else {
-                                                                        errors++;
-                                                                        j--;
-                                                                    }
-                                                                }
-                                                            }
-                                                            if (j == Files[i].nChunkPackets) {
-                                                                resp.newBuilder().setRes("ok").build().writeDelimitedTo(sockets[p].getOutputStream());
-                                                                ((JProgressBar) progress.comps[rowIndex + 1]).setValue(((JProgressBar) progress.comps[rowIndex + 1]).getValue() + 1);
-                                                                //monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento completato\n");
-                                                            } else {
-                                                                resp.newBuilder().setRes("not").build().writeDelimitedTo(sockets[p].getOutputStream());
-                                                                //monitor.append(sockets[p].getRemoteSocketAddress() + ": Trasferimento fallito\n");
-                                                            }
-                                                        }
-
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        
-                                        progress.delRow(rowIndex);
-                                        monitor.append(sockets[p].getRemoteSocketAddress() + ": Sincronizzazione completata\n");
-                                    } catch (IOException ex) {
-                                        JOptionPane.showMessageDialog(Dani3laClient.this, "Errore di connessione");
-                                        //conButton.setText("Connetti");
-                                        //syncButton.setEnabled(false);
-                                    }
-
-                                    monitor.append("Host disconnesso: " + sockets[p].getRemoteSocketAddress() + "\n");
-                                    try {
-                                        sockets[p].close();
-                                    } catch (IOException ex) {
-                                    }
-                                }
-                            }).start();
-
-                            z++;
-                            sockRealloc(z + 1);
-                        } catch (IOException ex) {
-                        }
+                    monitor.append(LocalDateTime.now() + " | Indirizzo IP corrente: " + netAddress + "\n");
+                    byte[] bAddress = netAddress.getAddress();
+                    for (int s = 0; s < 255; s++) {
+                        bAddress[3] = new Integer(s).byteValue();
+                        InetAddress address = InetAddress.getByAddress(bAddress);
+                        Thread t = new Thread(new SyncThread(monitor, address, Files, progress, ChunkSize));
+                        t.start();
                     }
                 } catch (UnknownHostException ex) {
                     JOptionPane.showMessageDialog(Dani3laClient.this, "Impossible trovare indirizzo IP corrente");
                 }
             }
         });
-    }
-
-    private void sockRealloc(int newLength) {
-        Socket[] newArray = new Socket[newLength];
-        System.arraycopy(sockets, 0, newArray, 0, sockets.length);
-        sockets = newArray;
     }
 
     /**
@@ -459,6 +348,13 @@ public class Dani3laClient extends JFrame {
         if (syncDir != null) {
             BufferedWriter writer = new BufferedWriter(new FileWriter(new File("cConfig.ini"), false));
             String s = "Path = " + syncDir.getAbsolutePath();
+            writer.write(s);
+
+            writer.newLine();
+            if (netAddress == null) {
+                netAddress = InetAddress.getLocalHost();
+            }
+            s = "Address = " + netAddress.getHostAddress();
             writer.write(s);
 
             writer.close();
@@ -473,13 +369,22 @@ public class Dani3laClient extends JFrame {
     private void readConfig() throws IOException {
         if (new File("cConfig.ini").exists()) {
             BufferedReader reader = new BufferedReader(new FileReader(new File("cConfig.ini")));
-            String s = reader.readLine();
-            if (s.contains("Path = ")) {
-                syncDir = new File(s.split(" = ")[1]);
-                if (!syncDir.exists() || !syncDir.isDirectory()) {
-                    syncDir = null;
-                } else if (syncDir.exists() && syncDir.isDirectory()) {
-                    dirText.setText(syncDir.getAbsolutePath());
+            String s;
+            if ((s = reader.readLine()) != null) {
+                if (s.contains("Path = ")) {
+                    syncDir = new File(s.split(" = ")[1]);
+                    if (!syncDir.exists() || !syncDir.isDirectory()) {
+                        syncDir = null;
+                    } else if (syncDir.exists() && syncDir.isDirectory()) {
+                        dirText.setText(syncDir.getAbsolutePath());
+                    }
+                }
+            }
+            if ((s = reader.readLine()) != null) {
+                if (s.contains("Address = ")) {
+                    netAddress = InetAddress.getByName(s.split(" = ")[1]);
+                } else {
+                    netAddress = InetAddress.getLocalHost();
                 }
             }
 
