@@ -1,4 +1,4 @@
-# DaniSyncClient
+# Dani3laClient
 Java client application for file synchronization
 
 Server: https://github.com/FiordiStefano/Dani3laServer
