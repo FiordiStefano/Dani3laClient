@@ -15,11 +15,13 @@ import javax.swing.JTextArea;
 import packet.protoPacket;
 
 /**
+ * Classe che gestisce la sincronizzazione, accoglie le richieste del server per
+ * il trasferimento di file indice e pezzi di file
  *
  * @author Stefano Fiordi
  */
 public class SyncThread implements Runnable {
-    
+
     JTextArea monitor;
     InetAddress address;
     FileHandlerClient[] Files;
@@ -32,8 +34,8 @@ public class SyncThread implements Runnable {
         this.Files = Files;
         this.progress = progress;
         this.ChunkSize = ChunkSize;
-    }    
-    
+    }
+
     private protoPacket.crcInfo createCRCInfoPacket() {
         protoPacket.crcInfo packet = protoPacket.crcInfo.newBuilder()
                 .setCsz(ChunkSize)
@@ -124,6 +126,7 @@ public class SyncThread implements Runnable {
                     progress.setVisible(true);
                     rowIndex = progress.addRow(socket.getInetAddress().getHostAddress(), ChunksInfoPacket.getInd());
                     ((JProgressBar) progress.comps[rowIndex + 1]).setValue(0);
+                    monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + " | Pezzi da trasferire: " + ChunksInfoPacket.getInd() + "\n");
                 }
 
                 while (true) {
@@ -185,7 +188,7 @@ public class SyncThread implements Runnable {
                 //progress.delRow(rowIndex);
                 monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Sincronizzazione completata\n");
             } catch (IOException ex) {
-                monitor.append(LocalDateTime.now() + " | Errore di connessione: " + address.getHostAddress() + "\n");
+                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Errore di connessione: " + address.getHostAddress() + "\n");
             }
 
             monitor.append(LocalDateTime.now() + " | Host disconnesso: " + socket.getRemoteSocketAddress() + "\n");

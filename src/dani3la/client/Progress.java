@@ -13,16 +13,15 @@ import java.awt.GridBagLayout;
 import java.awt.HeadlessException;
 import java.awt.Insets;
 import java.awt.Toolkit;
-import java.io.IOException;
 import javax.swing.JFrame;
-import static javax.swing.JFrame.EXIT_ON_CLOSE;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 
 /**
+ * Classe che inizializza e configura la GUI per le progress bar che monitorano
+ * l'andamento della sincronizzazione
  *
  * @author Stefano Fiordi
  */
@@ -34,8 +33,8 @@ public class Progress extends JFrame {
 
     /**
      * Costruttore che inizializza il frame
-     * 
-     * @throws HeadlessException 
+     *
+     * @throws HeadlessException
      */
     public Progress() throws HeadlessException {
         int width = (Toolkit.getDefaultToolkit().getScreenSize().width * 34) / 100;
@@ -66,7 +65,7 @@ public class Progress extends JFrame {
 
     /**
      * Metodo per il riallocamento dell'array di Components
-     * 
+     *
      * @param length la nuova lunghezza dell'array
      */
     private void realloc(int length) {
@@ -82,7 +81,7 @@ public class Progress extends JFrame {
 
     /**
      * Metodo che accoda una nuova riga
-     * 
+     *
      * @param s la stringa della nuova label
      * @param maxVal valore massimo progress bar
      * @return l'indice dei nuovi componenti
@@ -142,16 +141,16 @@ public class Progress extends JFrame {
 
         return comps.length - 2;
     }
-    
+
     /**
      * Metodo che elimina una riga
-     * 
+     *
      * @param index l'indice dei componenti da eliminare
      */
     protected void delRow(int index) {
         pane.remove(comps[index + 1]);
         pane.remove(comps[index]);
-        
+
         pane.revalidate();
         pane.repaint();
     }

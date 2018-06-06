@@ -19,17 +19,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.Socket;
-import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.Enumeration;
-import javafx.util.converter.LocalDateTimeStringConverter;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -41,13 +32,10 @@ import javax.swing.JTextField;
 import static javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE;
 import javax.swing.text.DefaultCaret;
 import packet.protoPacket.crcInfo;
-import packet.protoPacket.crcReq;
-import packet.protoPacket.resp;
-import packet.protoPacket.chunkReq;
 
 /**
  * Classe principale che crea e gestisce la GUI, gestisce la cartella da
- * sincronizzare (indicizzazione e sincronizzazione) e gestisce la connessione.
+ * sincronizzare e gestisce la connessione con i server
  *
  * @author Stefano Fiordi
  */

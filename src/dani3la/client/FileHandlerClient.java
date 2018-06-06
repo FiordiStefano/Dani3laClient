@@ -19,7 +19,6 @@ import java.nio.file.Files;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
 import javax.swing.JProgressBar;
-import javax.swing.JTextArea;
 import packet.protoPacket.data;
 import packet.protoPacket.info;
 
