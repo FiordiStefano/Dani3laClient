@@ -339,10 +339,11 @@ public class Dani3laClient extends JFrame {
             writer.write(s);
 
             writer.newLine();
-            if (netAddress == null) {
-                netAddress = InetAddress.getLocalHost();
+            if (netAddress != null && netAddress != InetAddress.getLocalHost()) {
+                s = "Address = " + netAddress.getLocalHost();
+            } else {
+                s = "Address = ";
             }
-            s = "Address = " + netAddress.getHostAddress();
             writer.write(s);
 
             writer.close();
