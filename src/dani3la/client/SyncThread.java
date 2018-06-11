@@ -74,9 +74,11 @@ public class SyncThread implements Runnable {
                     synchronized (this) {
                         for (int i = 0; i < Files.length; i++) {
                             if (Files[i].crcIndex.getName().equals(request.getCrc()) && Files[i].version == request.getVer()) {
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Invio pacchetto info crc\n");
                                 Files[i].getCRCIndexInfoPacket().writeDelimitedTo(socket.getOutputStream());
-
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Attesa risposta\n");
                                 protoPacket.resp infoRespPacket = protoPacket.resp.parseDelimitedFrom(socket.getInputStream());
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Risposta ricevuta\n");
                                 if (infoRespPacket.getRes().equals("ok")) {
                                     monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Inizio trasferimento " + Files[i].crcIndex.getName() + "...\n");
                                     int errors = 0, j = 0;
@@ -119,30 +121,43 @@ public class SyncThread implements Runnable {
                     }
                 }
 
-                int rowIndex;
+                int rowIndex, max;
                 protoPacket.resp ChunksInfoPacket = protoPacket.resp.parseDelimitedFrom(socket.getInputStream());
                 protoPacket.resp.newBuilder().setRes("ok").build().writeDelimitedTo(socket.getOutputStream());
                 synchronized (this) {
                     progress.setVisible(true);
-                    rowIndex = progress.addRow(socket.getInetAddress().getHostAddress(), ChunksInfoPacket.getInd());
+                    max = ChunksInfoPacket.getInd();
+                    if (max == 0) {
+                        max++;
+                    }
+                    rowIndex = progress.addRow(socket.getInetAddress().getHostAddress(), max);
                     ((JProgressBar) progress.comps[rowIndex + 1]).setValue(0);
-                    monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + " | Pezzi da trasferire: " + ChunksInfoPacket.getInd() + "\n");
+                    monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Pezzi da trasferire: " + ChunksInfoPacket.getInd() + "\n");
                 }
 
                 while (true) {
+                    monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Attesa richiesta pezzo file...\n");
                     protoPacket.chunkReq chunkReqPacket = protoPacket.chunkReq.parseDelimitedFrom(socket.getInputStream());
+                    monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Richiesta ricevuta\n");
                     if (chunkReqPacket.getInd() == -1) {
-                        ((JProgressBar) progress.comps[rowIndex + 1]).setValue(ChunksInfoPacket.getInd());
+                        ((JProgressBar) progress.comps[rowIndex + 1]).setValue(max);
                         break;
                     }
                     synchronized (this) {
+                        monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Ricerca del file richiesto...\n");
                         for (int i = 0; i < Files.length; i++) {
                             if (chunkReqPacket.getNam().equals(Files[i].ClientFile.getName())) {
                                 //monitor.append(sockets[p].getRemoteSocketAddress() + ": Invio pezzo n." + chunkReqPacket.getInd() + " del file " + chunkReqPacket.getNam() + "...\n");
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": File trovato\n");
                                 Files[i].setChunkToSend(chunkReqPacket.getInd());
-                                Files[i].getChunkInfoPacket(chunkReqPacket.getInd()).writeDelimitedTo(socket.getOutputStream());
-
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Pezzo trovato\n");
+                                protoPacket.info ChunkInfoPacket = Files[i].getChunkInfoPacket(chunkReqPacket.getInd());
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Pacchetto info creato\n");
+                                ChunkInfoPacket.writeDelimitedTo(socket.getOutputStream());
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Pacchetto info inviato\n");
+                                
                                 protoPacket.resp chunkInfoRespPacket = protoPacket.resp.parseDelimitedFrom(socket.getInputStream());
+                                monitor.append(LocalDateTime.now() + " | " + socket.getRemoteSocketAddress() + ": Inizio invio pezzo\n");
                                 if (chunkInfoRespPacket.getRes().equals("ok")) {
                                     int errors = 0, j;
                                     OUTER:

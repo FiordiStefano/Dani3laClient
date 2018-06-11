@@ -1777,7 +1777,7 @@ public final class protoPacket {
       com.google.protobuf.MessageOrBuilder {
 
     /**
-     * <code>int32 csz = 1;</code>
+     * <code>uint32 csz = 1;</code>
      */
     int getCsz();
 
@@ -1892,7 +1892,7 @@ public final class protoPacket {
             }
             case 8: {
 
-              csz_ = input.readInt32();
+              csz_ = input.readUInt32();
               break;
             }
             case 16: {
@@ -2007,7 +2007,7 @@ public final class protoPacket {
     public static final int CSZ_FIELD_NUMBER = 1;
     private int csz_;
     /**
-     * <code>int32 csz = 1;</code>
+     * <code>uint32 csz = 1;</code>
      */
     public int getCsz() {
       return csz_;
@@ -2125,7 +2125,7 @@ public final class protoPacket {
                         throws java.io.IOException {
       getSerializedSize();
       if (csz_ != 0) {
-        output.writeInt32(1, csz_);
+        output.writeUInt32(1, csz_);
       }
       if (getLenList().size() > 0) {
         output.writeUInt32NoTag(18);
@@ -2161,7 +2161,7 @@ public final class protoPacket {
       size = 0;
       if (csz_ != 0) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(1, csz_);
+          .computeUInt32Size(1, csz_);
       }
       {
         int dataSize = 0;
@@ -2567,13 +2567,13 @@ public final class protoPacket {
 
       private int csz_ ;
       /**
-       * <code>int32 csz = 1;</code>
+       * <code>uint32 csz = 1;</code>
        */
       public int getCsz() {
         return csz_;
       }
       /**
-       * <code>int32 csz = 1;</code>
+       * <code>uint32 csz = 1;</code>
        */
       public Builder setCsz(int value) {
         
@@ -2582,7 +2582,7 @@ public final class protoPacket {
         return this;
       }
       /**
-       * <code>int32 csz = 1;</code>
+       * <code>uint32 csz = 1;</code>
        */
       public Builder clearCsz() {
         
@@ -4215,7 +4215,7 @@ public final class protoPacket {
       "\001(\t\022\013\n\003len\030\002 \001(\003\022\013\n\003ver\030\003 \001(\003\" \n\004resp\022\013\n" +
       "\003res\030\001 \001(\t\022\013\n\003ind\030\002 \001(\021\" \n\004data\022\013\n\003num\030\001" +
       " \001(\005\022\013\n\003dat\030\002 \001(\014\"J\n\007crcInfo\022\013\n\003csz\030\001 \001(" +
-      "\005\022\013\n\003len\030\002 \003(\003\022\013\n\003crc\030\003 \003(\t\022\013\n\003ver\030\004 \003(\003" +
+      "\r\022\013\n\003len\030\002 \003(\003\022\013\n\003crc\030\003 \003(\t\022\013\n\003ver\030\004 \003(\003" +
       "\022\013\n\003cln\030\005 \003(\003\"\"\n\006crcReq\022\013\n\003crc\030\001 \001(\t\022\013\n\003" +
       "ver\030\002 \001(\003\"1\n\010chunkReq\022\013\n\003ind\030\001 \001(\021\022\013\n\003cr" +
       "c\030\002 \001(\003\022\013\n\003nam\030\003 \001(\tB\025\n\006packetB\013protoPac" +

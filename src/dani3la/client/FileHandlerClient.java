@@ -35,7 +35,7 @@ public class FileHandlerClient {
     /**
      * Dimensione dei pacchetti
      */
-    private final int PacketLength = 4096;
+    private final int PacketLength = 65536;
     /**
      * File da sincronizzare
      */
@@ -136,7 +136,7 @@ public class FileHandlerClient {
      *
      * @return il pacchetto informazioni
      */
-    protected info getCRCIndexInfoPacket() {
+    protected info getCRCIndexInfoPacket() {   
         return info.newBuilder()
                 .setNam(crcIndex.getName())
                 .setLen(crcIndex.length())
@@ -224,18 +224,6 @@ public class FileHandlerClient {
     }
 
     /**
-     * Crea il pacchetto contenente le informazioni sul file da inviare
-     *
-     * @return il pacchetto informazioni
-     */
-    /*protected info getInfoPacket() {
-        return info.newBuilder()
-                .setNam(ClientFile.getName())
-                .setLen(ClientFile.length())
-                .setVer(version)
-                .build();
-    }*/
-    /**
      * Metodo che crea il pacchetto dati
      *
      * @param packetIndex il numero del pacchetto
@@ -250,23 +238,6 @@ public class FileHandlerClient {
                 .build();
     }
 
-    /**
-     * Metodo che costruisce il pacchetto
-     *
-     * @param packetIndex il numero del pacchetto
-     * @return il pacchetto da inviare
-     * @throws IOException se si verifica un errore di lettura
-     * @throws MyExc se si verifica un errore di lettura
-     */
-    /*public data buildPacket(int packetIndex) throws IOException, MyExc {
-        ByteBuffer buf = ByteBuffer.allocate(PacketLength);
-        int len;
-        if ((len = fcClient.read(buf, (long) packetIndex * PacketLength)) != -1) {
-            return createPacket(packetIndex, getByteArray(buf));
-        } else {
-            throw new MyExc("Error while reading packet from file");
-        }
-    }*/
     /**
      * Calcola i digest e li scrive su un file .crc
      *

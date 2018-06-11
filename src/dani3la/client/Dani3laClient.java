@@ -338,13 +338,11 @@ public class Dani3laClient extends JFrame {
             String s = "Path = " + syncDir.getAbsolutePath();
             writer.write(s);
 
-            writer.newLine();
-            if (netAddress != null && netAddress != InetAddress.getLocalHost()) {
-                s = "Address = " + netAddress.getLocalHost();
-            } else {
-                s = "Address = ";
-            }
-            writer.write(s);
+            if (netAddress != null && !netAddress.getHostAddress().equals(InetAddress.getLocalHost().getHostAddress())) {
+                writer.newLine();
+                s = "Address = " + netAddress.getHostAddress();
+                writer.write(s);
+            }  
 
             writer.close();
         }
@@ -370,10 +368,8 @@ public class Dani3laClient extends JFrame {
                 }
             }
             if ((s = reader.readLine()) != null) {
-                if (s.contains("Address = ")) {
+                if (s.contains("Address = ") && s.split(" = ").length > 1) {
                     netAddress = InetAddress.getByName(s.split(" = ")[1]);
-                } else {
-                    netAddress = InetAddress.getLocalHost();
                 }
             }
 
